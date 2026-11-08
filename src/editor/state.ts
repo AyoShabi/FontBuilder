@@ -53,6 +53,8 @@ function loadStore(): Store {
   return store;
 }
 
+export type Tool = "select" | "add" | "remove" | "bend";
+
 export const state = {
   store: loadStore(),
   font: null as Font | null,
@@ -63,8 +65,8 @@ export const state = {
   link: null as string | null,
   /** The zone picked in the inspector. Linked reshapes use it while the selection is that zone. */
   zone: null as ZoneKey | null,
-  /** Editor tool: "select" moves points, "add" puts new points on the outline, "bend" curves a straight line. */
-  tool: "select" as "select" | "add" | "bend",
+  /** Editor tool: "select" moves points, "add" puts new points on the outline, "remove" deletes the point clicked, "bend" curves a straight line. */
+  tool: "select" as Tool,
 };
 
 /** Where a file in extension/fonts/<slug>/ is: a path on disk inside Illustrator, a URL in a browser preview. */

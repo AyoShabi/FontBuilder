@@ -189,3 +189,24 @@ describe("artboard preview", () => {
     expect(groups).toHaveLength(0);
   });
 });
+
+describe("Illustrator-style editing", () => {
+  it("Shift keeps a drag horizontal, vertical or at 45 degrees", async () => {
+    const { constrain } = await import("../src/ui/stage");
+    expect(constrain(100, 12)).toEqual([100, 0]);
+    expect(constrain(-8, 90)).toEqual([0, 90]);
+    const [x, y] = constrain(50, 46);
+    expect(Math.abs(x - y)).toBeLessThan(1e-9);
+    expect(x).toBeCloseTo(48, 0);
+  });
+
+  it("asks Illustrator for the editor's keys with every modifier", async () => {
+    const { keyInterest, PANEL_KEYS } = await import("../src/panel/keys");
+    const ks = keyInterest();
+    expect(ks.length).toBe(PANEL_KEYS.length * 16);
+    expect(ks).toContainEqual({ keyCode: 32 }); // Space for the hand
+    expect(ks).toContainEqual({ keyCode: 67, shiftKey: true }); // Shift+C
+    expect(ks).toContainEqual({ keyCode: 187, ctrlKey: true }); // Ctrl+=
+    expect(ks).toContainEqual({ keyCode: 90, ctrlKey: true, shiftKey: true }); // redo
+  });
+});

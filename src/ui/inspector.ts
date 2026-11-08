@@ -97,7 +97,7 @@ export function renderInspector(): void {
         ? `Reshape ${plural(sel.size, "selected point")}${linkedGids().length > 1 ? " (this letter only)" : ""}`
         : `Reshape whole letter${across}`;
   const m = linkedGids().length;
-  $("#spaceLabel").textContent = m > 1 ? `Spacing (font units) · sets all ${m}` : "Spacing (font units)";
+  $("#spaceLabel").textContent = m > 1 ? `Spacing · sets all ${m}` : "Spacing";
   $("#resetGlyph").textContent = m > 1 ? `Reset ${m} letters` : "Reset this letter";
 
   const cn = $("#compNote");
@@ -135,7 +135,7 @@ export function renderInspector(): void {
 }
 
 export function bindInspector(app: App): void {
-  $(".insp").addEventListener("click", (e) => {
+  $(".side").addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-xf]");
     if (!b) return;
     const t = currentTarget();

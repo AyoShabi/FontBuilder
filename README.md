@@ -10,21 +10,34 @@ brand's own font.
   they have. You can also pick a TrueType font installed on your computer, or choose a `.ttf`
   file. Only fonts whose licence allows changes are offered (SIL Open Font License or Apache).
   Adobe Fonts and most bought fonts can't be changed.
-- **Character grid**: every character in the font, with the key letters first. Click one to edit it.
-- **Letter editor**:
-  - Drag points and curve handles.
-  - **Add point** (P, or Alt-click) adds points.
-  - **Curve** (C): drag a straight line to bend it.
-  - Delete removes points, and deleting a curve's handle straightens it.
-  - Arrow keys nudge the selected points.
-  - Undo and redo.
+- **Character grid**: every character in the font: lowercase, then capitals, then figures, then
+  everything else. Click one to edit it.
+- **Letter editor**, with Illustrator's keys:
+
+  | Key | Does |
+  | --- | --- |
+  | V or A | Select and move points |
+  | P or + (or hold Alt) | Add a point on the outline |
+  | − | Delete the point you click |
+  | Shift+C (or C) | Curve: drag a straight line to bend it |
+  | Shift while dragging | Keep the move horizontal, vertical or at 45° |
+  | Shift-click | Add a point to the selection, or take it out |
+  | Space-drag, middle-drag, scroll | Move the view |
+  | Alt+scroll, Ctrl+scroll, Ctrl + / Ctrl − | Zoom in and out |
+  | Ctrl+0 | Fit the letter |
+  | Ctrl+Y | Filled preview on or off |
+  | Arrows (Shift: ×10) | Nudge the selected points |
+  | Delete | Delete the selected points (a curve handle straightens that part) |
+  | Ctrl+A, Ctrl+Shift+A, Esc | Select all, deselect |
+  | Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
+
 - **Heights**: sliders for ascender, cap height, x-height and descender. Each one changes every
   letter at once, and the baseline stays put.
 - **Spacing and shape**: set the left and right space and the width of a letter, or reshape it
   (narrower, wider, taller, slant). You can apply these to a whole group of letters at once, such
   as the lowercase, letters with tails, or a group you make.
 - **Guided stages**: n o H O first, then the lowercase, the capitals, and figures and
-  punctuation. Each stage has test words and lets you tick letters off as reviewed.
+  punctuation. Each stage lets you tick letters off as reviewed.
 - **Preview on your artboard**: select text in your Illustrator document and click **Preview
   selected text**. FontBuilder hides that text and draws it in your edited font in the same
   place, size and colour. It redraws after every edit. **Stop preview** removes the drawing and
@@ -32,8 +45,8 @@ brand's own font.
 - **Export**: saves a `.ttf` with your font's name and style, and a licence file next to it. The
   name is checked against the licence's Reserved Font Names. The original copyright and licence
   stay in the font. Kerning and other features carry over.
-- **Projects**: your work is saved in the panel automatically. **Save project** and **Open
-  project** move it between computers.
+- **Projects**: your work is saved in the panel automatically. **Project > Save project** and
+  **Open project** move it between computers.
 
 ## Install (Windows)
 

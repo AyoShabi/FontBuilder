@@ -2,7 +2,6 @@ import { createApp } from "./ui/app";
 import { bindFiles } from "./ui/files";
 import { bindGrids } from "./ui/grids";
 import { bindInspector } from "./ui/inspector";
-import { bindProofs } from "./ui/proofs";
 import { bindStage } from "./ui/stage";
 import { bindStages } from "./ui/stages";
 import { bindToolbar } from "./ui/toolbar";
@@ -17,9 +16,13 @@ bindGrids(app);
 bindStage(app);
 bindInspector(app);
 bindStages(app);
-bindProofs();
 bindFiles(app);
 bindArtboard();
+// The Project menu closes when you click anywhere else.
+document.addEventListener("pointerdown", (e) => {
+  const m = document.querySelector<HTMLDetailsElement>(".menu");
+  if (m?.open && !m.contains(e.target as Node)) m.open = false;
+});
 registerKeys();
 
 $("#undo").onclick = () => app.undo();

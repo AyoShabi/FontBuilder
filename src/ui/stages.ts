@@ -81,7 +81,6 @@ export function renderStages(): void {
         : "Every stage is reviewed";
   $<HTMLButtonElement>("#nextLetter").textContent = done < total || !next ? "Next letter" : `Go to ${next.title}`;
 
-  $("#stageProof").innerHTML = s.proofs.map((t) => `<div>${escapeHtml(t)}</div>`).join("");
 }
 
 function selectGid(app: App, gid: number): void {

@@ -1,6 +1,6 @@
 /**
  * Live preview: rebuilds the edited font and swaps it in as the `--live` CSS font family,
- * which the glyph grid, specimen and posters all use.
+ * which the letter grid and stage letters use.
  */
 import { buildFont } from "../font/writer";
 import { outlineSource } from "../editor/project";
