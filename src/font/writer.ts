@@ -14,6 +14,8 @@ export interface OutlineSource {
   /** Fully resolved contours of any glyph (composites flattened), used for bounding boxes. */
   contours(gid: number): Point[][];
   advance(gid: number): number;
+  /** New x-height and cap height for the OS/2 table, when they changed. */
+  heights?: { xh: number; cap: number };
 }
 
 export function encodeSimple(ends: number[], pts: Point[]): { bytes: Uint8Array; box: BBox | null } {
@@ -87,7 +89,8 @@ export interface FontNaming {
 }
 
 /** A fresh name table for the renamed font. Keeps the original copyright (0) and licence (13, 14). */
-export function buildName(font: Font, naming: FontNaming): Uint8Array {
+export function buildName(font: Font, naming: FontNaming | string): Uint8Array {
+  if (typeof naming === "string") naming = { family: naming, style: "Regular" };
   const o = font.names;
   const fam = naming.family;
   const style = naming.style || "Regular";
@@ -149,7 +152,8 @@ const DROP = new Set(["DSIG", "hdmx", "LTSH", "VDMX", "fvar", "gvar", "avar", "H
  * Builds a complete .ttf from the parsed font and the edited outlines.
  * Every source table not in DROP is copied as is, so GPOS, GSUB, GDEF and the rest carry over.
  */
-export function buildFont(font: Font, naming: FontNaming, src: OutlineSource): Uint8Array {
+export function buildFont(font: Font, naming: FontNaming | string, src: OutlineSource): Uint8Array {
+  if (typeof naming === "string") naming = { family: naming, style: "Regular" };
   const N = font.N;
   const parts: Uint8Array[] = [];
   const loca = new DataView(new ArrayBuffer((N + 1) * 4));
@@ -269,6 +273,10 @@ export function buildFont(font: Font, naming: FontNaming, src: OutlineSource): U
     const os = font.tables["OS/2"].slice();
     const ov = new DataView(os.buffer);
     ov.setInt16(2, nAdv ? Math.round(sumAdv / nAdv) : 0);
+    if (src.heights && ov.getUint16(0) >= 2 && os.length >= 90) {
+      ov.setInt16(86, src.heights.xh);
+      ov.setInt16(88, src.heights.cap);
+    }
     const weight = weightClass(naming.style);
     if (weight) ov.setUint16(4, weight);
     // fsSelection: ITALIC 0x1, BOLD 0x20, REGULAR 0x40; USE_TYPO_METRICS (0x80) is kept.

@@ -1,68 +1,169 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FontBuilder</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FontBuilder</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div>
       <h1>FontBuilder</h1>
-      <p class="muted">Make a font for your brand by redrawing an open-licence font with Illustrator's own tools.</p>
-    </header>
+      <p>Edit an open-licence font letter by letter, see it on your artboard, and export it as your brand's own font.</p>
+    </div>
+    <div class="actions">
+      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+      <button id="saveProj">Save project</button>
+      <button id="openProj">Open project</button>
+      <input id="projFile" type="file" accept=".json,application/json" hidden>
+      <button id="export" class="primary">Export font (.ttf)</button>
+    </div>
+  </header>
 
-    <p id="hostnote" class="status info" hidden>This is a preview. Inside Illustrator, open it from Window &gt; Extensions &gt; FontBuilder to create a canvas.</p>
+  <section class="toolbar" aria-label="Font settings">
+    <div class="field">
+      <label class="label" for="fontSel">Starting font</label>
+      <select id="fontSel"></select>
+      <input id="upFile" type="file" accept=".ttf,font/ttf" hidden>
+    </div>
+    <div id="axes" style="display:contents"></div>
+    <div class="field">
+      <div class="row"><label class="label" for="track">Letter spacing</label><output id="trackOut">0</output></div>
+      <input id="track" type="range" min="-120" max="240" step="2" value="0">
+    </div>
+    <div class="field">
+      <label class="label" for="famName">Your font's name</label>
+      <input id="famName" type="text" value="Brand Display" spellcheck="false">
+      <span id="nameNote" class="note"></span>
+    </div>
+    <div class="field">
+      <label class="label" for="styleName">Style</label>
+      <input id="styleName" type="text" value="Regular" spellcheck="false" placeholder="Regular, Bold, Black…">
+    </div>
+  </section>
 
-    <section class="card">
-      <h2>1. Choose a starting font</h2>
+  <section class="heights" aria-label="Heights">
+    <div class="row spread"><div class="label">Heights · move these to change every letter</div><button id="resetHeights" class="small">Reset heights</button></div>
+    <div class="hgrid">
+      <div class="field"><div class="row"><label class="label" for="h_asc">Ascender</label><output id="h_asco"></output></div><input id="h_asc" type="range" step="1" value="0"></div>
+      <div class="field"><div class="row"><label class="label" for="h_cap">Cap height</label><output id="h_capo"></output></div><input id="h_cap" type="range" step="1" value="0"></div>
+      <div class="field"><div class="row"><label class="label" for="h_xh">x-height</label><output id="h_xho"></output></div><input id="h_xh" type="range" step="1" value="0"></div>
+      <div class="field"><div class="row"><label class="label" for="h_desc">Descender</label><output id="h_desco"></output></div><input id="h_desc" type="range" step="1" value="0"></div>
+    </div>
+  </section>
+
+  <section class="stages" aria-label="Design stages">
+    <ol class="stepper" id="stepper"></ol>
+    <div class="stagebody">
+      <div class="stageinfo">
+        <p id="stageGoal"></p>
+        <div id="stageFams"></div>
+        <div class="btns">
+          <button id="markReviewed" aria-pressed="false">Mark reviewed</button>
+          <button id="nextLetter">Next letter</button>
+          <span class="note" id="stageNote"></span>
+        </div>
+      </div>
+      <div class="stageproof" id="stageProof" aria-label="Test words"></div>
+    </div>
+  </section>
+
+  <section class="bench">
+    <div class="panel glyphs" aria-label="Characters">
+      <div class="label">Key letters</div>
+      <div class="grid" id="sigGrid"></div>
+      <div class="label">All characters</div>
+      <div class="grid" id="allGrid"></div>
+    </div>
+
+    <div class="panel editor">
+      <div class="edhead">
+        <div class="tools">
+          <div class="seg" role="group" aria-label="Tool">
+            <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select</button>
+            <button id="toolAdd" aria-pressed="false" title="Click the outline to add a point (P)">Add point</button>
+            <button id="toolBend" aria-pressed="false" title="Drag a straight line to bend it into a curve (C)">Curve</button>
+          </div>
+          <label><input id="showGhost" type="checkbox" checked> Original</label>
+          <label><input id="solid" type="checkbox"> Solid</label>
+        </div>
+        <span class="note mono" id="pointInfo"></span>
+      </div>
+      <svg id="stage" aria-label="Letter editor" tabindex="0"></svg>
+      <div class="hint">Drag points and handles. Arrows nudge 1, Shift+arrows 10. P adds points, C bends a line, V selects, Delete removes.</div>
+      <div class="loading" id="loading" hidden>Loading…</div>
+    </div>
+
+    <aside class="panel insp" aria-label="Letter settings">
+      <h2><span class="big" id="inspChar">C</span><span id="inspName" class="mono note"></span></h2>
+      <div class="label">Apply edits to a group</div>
+      <select id="linkGroup" aria-label="Linked group"></select>
+      <p class="note" id="linkNote" hidden></p>
+      <div id="grpForm" class="kv" hidden>
+        <label for="grpName">Name</label><input id="grpName" type="text">
+        <label for="grpChars">Letters</label><input id="grpChars" type="text" placeholder="gjpqy">
+      </div>
+      <div class="btns" id="grpBtns" hidden><button id="grpDelete">Delete group</button></div>
+      <hr>
+      <div class="label" id="spaceLabel">Spacing (font units)</div>
+      <div class="kv">
+        <label for="lsb">Left side</label><input id="lsb" type="number" step="1">
+        <label for="rsb">Right side</label><input id="rsb" type="number" step="1">
+        <label for="advw">Width</label><input id="advw" type="number" step="1">
+      </div>
+      <hr>
+      <div class="label">Zone</div>
+      <div class="btns" id="zoneBtns">
+        <button data-zone="desc" aria-pressed="false">Below baseline</button>
+        <button data-zone="asc" aria-pressed="false">Above x-height</button>
+        <button data-zone="cap" aria-pressed="false">Above cap height</button>
+      </div>
+      <div class="label" id="xfLabel">Reshape whole letter</div>
+      <div class="btns">
+        <button data-xf="sx-">Narrower</button><button data-xf="sx+">Wider</button>
+        <button data-xf="sy-">Shorter</button><button data-xf="sy+">Taller</button>
+        <button data-xf="sk+">Slant right</button><button data-xf="sk-">Slant left</button>
+        <button data-xf="up">Raise</button><button data-xf="dn">Lower</button>
+      </div>
+      <div id="delBox" hidden><div class="btns"><button id="delPts">Delete point</button></div></div>
+      <div id="ptBox" hidden>
+        <hr>
+        <div class="label">Selected point</div>
+        <div class="kv">
+          <label for="ptx">x</label><input id="ptx" type="number" step="1">
+          <label for="pty">y</label><input id="pty" type="number" step="1">
+        </div>
+      </div>
+      <hr>
+      <div class="btns"><button id="resetGlyph">Reset this letter</button><button id="resetAll">Reset all edits</button></div>
+      <div id="confirmAll" class="note warn" hidden>Discard every edit in this font? <button id="confirmYes">Discard</button> <button id="confirmNo">Keep</button></div>
+      <p class="note" id="compNote" hidden></p>
+    </aside>
+  </section>
+
+  <section class="panel artboard" aria-label="Preview on artboard">
+    <div class="row spread">
+      <div class="label">Preview on your artboard</div>
+      <div class="btns"><button id="abAdd">Preview selected text</button><button id="abStop">Stop preview</button></div>
+    </div>
+    <p class="note" id="abStatus"></p>
+  </section>
+
+  <section class="proofs" aria-label="Test text">
+    <div class="spec">
       <div class="row">
-        <select id="font" aria-label="Starting font"></select>
-        <button type="button" id="pick" class="secondary">Choose a file…</button>
+        <input id="specText" type="text" value="Hamburgefonstiv" aria-label="Test text" spellcheck="false">
+        <div class="field"><div class="row"><label class="label" for="specSize">Size</label><output id="specSizeOut">96px</output></div><input id="specSize" type="range" min="24" max="240" value="96"></div>
       </div>
-      <p class="muted small">Only TrueType (.ttf) fonts under the SIL Open Font License or Apache License can be changed. Adobe Fonts and most fonts you buy can't.</p>
-
-      <div id="fontcard" hidden>
-        <p id="fontname" class="fontname"></p>
-        <div id="preview" class="preview"></div>
-        <p id="licence" class="licence"></p>
-      </div>
-    </section>
-
-    <section class="card" id="build" hidden>
-      <h2>2. Set up your canvas</h2>
-      <p class="muted">FontBuilder makes a new document with one artboard per letter. Each artboard is as wide as the letter's spacing, with guides for the baseline, x-height, cap height, ascender and descender. You'll work through the stages in this order:</p>
-      <div id="stages"></div>
-      <button type="button" id="create" class="primary">Create canvas</button>
-    </section>
-
-    <p id="status" class="status" hidden role="status"></p>
-
-    <section class="card" id="letters" hidden>
-      <div class="row spread">
-        <h2>Your letters <span id="canvasname" class="muted"></span></h2>
-        <button type="button" id="refresh" class="secondary small">Refresh</button>
-      </div>
-      <p class="muted">Click a letter to jump to its artboard. Draw on the Letters layer with any of Illustrator's tools; the guides are on a locked layer.</p>
-      <div id="letterlist"></div>
-    </section>
-
-    <section class="card" id="export" hidden>
-      <h2>3. Export your font</h2>
-      <p class="muted">FontBuilder reads every filled shape on the Letters layer, letter by artboard. An artboard's width is the letter's spacing, so resize it with the Artboard tool to change the space around a letter.</p>
-      <label class="field"><span>Font name</span><input id="family" type="text" placeholder="e.g. Umba Display" autocomplete="off" /></label>
-      <label class="field"><span>Style</span><input id="style" type="text" value="Regular" autocomplete="off" /></label>
-      <p id="nameproblem" class="small problem" hidden></p>
-      <div class="row">
-        <button type="button" id="check" class="secondary">Preview</button>
-        <button type="button" id="save" class="primary inline">Export font…</button>
-      </div>
-      <div id="result" hidden>
-        <div id="outpreview" class="preview"></div>
-        <ul id="notes" class="notes"></ul>
-      </div>
-    </section>
-
-    <script src="js/panel.js"></script>
-  </body>
+      <div id="specimen" style="font-size:96px">Hamburgefonstiv</div>
+    </div>
+    <div class="spec waterfall" id="waterfall"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script src="js/panel.js"></script>
+</body>
 </html>
