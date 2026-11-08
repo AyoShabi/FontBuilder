@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FontBuilder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>FontBuilder</h1>
+      <p class="muted">Make a font for your brand by redrawing an open-licence font with Illustrator's own tools.</p>
+    </header>
+
+    <p id="hostnote" class="status info" hidden>This is a preview. Inside Illustrator, open it from Window &gt; Extensions &gt; FontBuilder to create a canvas.</p>
+
+    <section class="card">
+      <h2>1. Choose a starting font</h2>
+      <div class="row">
+        <select id="font" aria-label="Starting font"></select>
+        <button type="button" id="pick" class="secondary">Choose a file…</button>
+      </div>
+      <p class="muted small">Only TrueType (.ttf) fonts under the SIL Open Font License or Apache License can be changed. Adobe Fonts and most fonts you buy can't.</p>
+
+      <div id="fontcard" hidden>
+        <p id="fontname" class="fontname"></p>
+        <div id="preview" class="preview"></div>
+        <p id="licence" class="licence"></p>
+      </div>
+    </section>
+
+    <section class="card" id="build" hidden>
+      <h2>2. Set up your canvas</h2>
+      <p class="muted">FontBuilder makes a new document with one artboard per letter. Each artboard is as wide as the letter's spacing, with guides for the baseline, x-height, cap height, ascender and descender. You'll work through the stages in this order:</p>
+      <div id="stages"></div>
+      <button type="button" id="create" class="primary">Create canvas</button>
+    </section>
+
+    <p id="status" class="status" hidden role="status"></p>
+
+    <section class="card" id="letters" hidden>
+      <div class="row spread">
+        <h2>Your letters <span id="canvasname" class="muted"></span></h2>
+        <button type="button" id="refresh" class="secondary small">Refresh</button>
+      </div>
+      <p class="muted">Click a letter to jump to its artboard. Draw on the Letters layer with any of Illustrator's tools; the guides are on a locked layer.</p>
+      <div id="letterlist"></div>
+    </section>
+
+    <script src="js/panel.js"></script>
+  </body>
+</html>
