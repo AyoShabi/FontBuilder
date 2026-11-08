@@ -11,7 +11,7 @@ cpSync("extension", out, { recursive: true });
 writeFileSync("dist/install-windows.cmd", readFileSync("install/install-windows.cmd", "utf8").replace(/\r?\n/g, "\r\n"));
 cpSync("install/install-mac.command", "dist/install-mac.command");
 await build({
-  entryPoints: ["src/panel/main.ts"],
+  entryPoints: ["src/main.ts"],
   bundle: true,
   format: "iife",
   target: "chrome88",

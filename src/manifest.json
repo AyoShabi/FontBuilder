@@ -1,0 +1,160 @@
+[
+ {
+  "slug": "anybody",
+  "name": "Anybody",
+  "axes": [
+   {
+    "tag": "wdth",
+    "values": [
+     50,
+     75,
+     100,
+     125,
+     150
+    ]
+   },
+   {
+    "tag": "wght",
+    "values": [
+     100,
+     200,
+     300,
+     400,
+     500,
+     600,
+     700,
+     800,
+     900
+    ]
+   }
+  ],
+  "default": {
+   "wdth": 100,
+   "wght": 800
+  },
+  "rfn": null
+ },
+ {
+  "slug": "tiltwarp",
+  "name": "Tilt Warp",
+  "axes": [
+   {
+    "tag": "XROT",
+    "values": [
+     -45,
+     -30,
+     -15,
+     0,
+     15,
+     30,
+     45
+    ]
+   },
+   {
+    "tag": "YROT",
+    "values": [
+     -45,
+     -30,
+     -15,
+     0,
+     15,
+     30,
+     45
+    ]
+   }
+  ],
+  "default": {
+   "XROT": 0,
+   "YROT": 0
+  },
+  "rfn": null
+ },
+ {
+  "slug": "sofia",
+  "name": "Sofia Sans Extra Condensed",
+  "axes": [
+   {
+    "tag": "wght",
+    "values": [
+     100,
+     200,
+     300,
+     400,
+     500,
+     600,
+     700,
+     800,
+     900,
+     1000
+    ]
+   }
+  ],
+  "default": {
+   "wght": 900
+  },
+  "rfn": null
+ },
+ {
+  "slug": "bigshoulders",
+  "name": "Big Shoulders Display",
+  "axes": [
+   {
+    "tag": "wght",
+    "values": [
+     100,
+     200,
+     300,
+     400,
+     500,
+     600,
+     700,
+     800,
+     900
+    ]
+   }
+  ],
+  "default": {
+   "wght": 800
+  },
+  "rfn": null
+ },
+ {
+  "slug": "gasoek",
+  "name": "Gasoek One",
+  "axes": [],
+  "default": {},
+  "rfn": null
+ },
+ {
+  "slug": "monasans",
+  "name": "Mona Sans",
+  "axes": [
+   {
+    "tag": "wdth",
+    "values": [
+     75,
+     100,
+     125
+    ]
+   },
+   {
+    "tag": "wght",
+    "values": [
+     200,
+     300,
+     400,
+     500,
+     600,
+     700,
+     800,
+     900
+    ]
+   }
+  ],
+  "default": {
+   "wdth": 100,
+   "wght": 800
+  },
+  "rfn": "Mona"
+ }
+]

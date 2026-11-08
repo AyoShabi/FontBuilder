@@ -34,12 +34,12 @@
           <Menu>FontBuilder</Menu>
           <Geometry>
             <Size>
-              <Height>720</Height>
-              <Width>340</Width>
+              <Height>860</Height>
+              <Width>1100</Width>
             </Size>
             <MinSize>
-              <Height>300</Height>
-              <Width>260</Width>
+              <Height>400</Height>
+              <Width>320</Width>
             </MinSize>
           </Geometry>
         </UI>

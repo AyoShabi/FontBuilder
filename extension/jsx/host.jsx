@@ -2,172 +2,182 @@
  * FontBuilder: the part that runs inside Illustrator (ExtendScript, which is ES3: no let/const,
  * no arrow functions, no JSON). The panel calls these functions with plain object literals and
  * gets back a string: "ok:..." on success or "error:..." with a message to show.
+ *
+ * Artboard preview: text frames you pick are hidden while FontBuilder draws the same text in
+ * your edited font as shapes in a group right above each one. Stopping the preview removes the
+ * shapes and shows the text frames again. A text frame being previewed is tagged in its `note`.
  */
 
-var FB_LETTERS = "Letters";
-var FB_GUIDES = "Guides";
-var FB_DATA = "FontBuilder data";
+var FB_TAG = "fontbuilder-preview:";
+var FB_GROUP = "FontBuilder preview ";
 
-function fbGray(v) {
-  var c = new RGBColor();
-  c.red = v;
-  c.green = v;
-  c.blue = v;
-  return c;
+/** A string as a JSON string literal (ExtendScript has no JSON object). */
+function fbStr(s) {
+  return '"' + String(s).replace(/[\\"]/g, "\\$&").replace(/\r/g, "\\r").replace(/\n/g, "\\n").replace(/[\u0000-\u001f]/g, "") + '"';
 }
 
-function fbAccent() {
-  var c = new RGBColor();
-  c.red = 0;
-  c.green = 150;
-  c.blue = 220;
-  return c;
+function fbNum(v) {
+  var r = Math.round(v * 1000) / 1000;
+  return isFinite(r) ? String(r) : "0";
 }
 
-/** Shifts a [l, t, r, b] rect by dx, dy. */
-function fbShift(r, dx, dy) {
-  return [r[0] + dx, r[1] + dy, r[2] + dx, r[3] + dy];
-}
-
-function fbAddLetter(layer, cell, dx, dy, black) {
-  var cp = layer.compoundPathItems.add();
-  cp.name = cell.name;
-  for (var i = 0; i < cell.contours.length; i++) {
-    var con = cell.contours[i];
-    var anchors = [];
-    for (var j = 0; j < con.length; j++) anchors.push([con[j].x + dx, con[j].y + dy]);
-    var p = cp.pathItems.add();
-    p.setEntirePath(anchors);
-    p.closed = true;
-    for (var k = 0; k < con.length; k++) {
-      var pt = p.pathPoints[k];
-      var a = con[k];
-      pt.leftDirection = [a.ix + dx, a.iy + dy];
-      pt.rightDirection = [a.ox + dx, a.oy + dy];
-      pt.pointType = a.smooth ? PointType.SMOOTH : PointType.CORNER;
-    }
-    p.stroked = false;
-    p.filled = true;
-    p.fillColor = black;
-    p.evenodd = false;
-  }
-  return cp;
-}
-
-/**
- * Creates a new document laid out by the panel: one artboard per letter, letters as editable
- * compound paths on the Letters layer, metric guides and labels on a locked Guides layer, and the
- * project data (source font, scale) on a hidden locked layer.
- */
-function fbBuildCanvas(spec) {
-  try {
-    var first = spec.cells[0];
-    if (!first) return "error:The font has none of the letters FontBuilder works with.";
-    var w0 = first.rect[2] - first.rect[0];
-    var h0 = first.rect[1] - first.rect[3];
-    var doc = app.documents.add(DocumentColorSpace.RGB, w0, h0);
-
-    // Centre the layout on the canvas: put the middle of the layout where the first artboard's middle is.
-    var ab0 = doc.artboards[0].artboardRect;
-    var b = spec.bounds;
-    var dx = (ab0[0] + ab0[2]) / 2 - (b[0] + b[2]) / 2;
-    var dy = (ab0[1] + ab0[3]) / 2 - (b[1] + b[3]) / 2;
-
-    var letters = doc.layers[0];
-    letters.name = FB_LETTERS;
-    var guides = doc.layers.add();
-    guides.name = FB_GUIDES;
-    guides.move(letters, ElementPlacement.PLACEAFTER);
-    var data = doc.layers.add();
-    data.name = FB_DATA;
-    data.move(guides, ElementPlacement.PLACEAFTER);
-
-    var black = fbGray(0);
-    var gray = fbGray(140);
-    var accent = fbAccent();
-
-    for (var i = 0; i < spec.cells.length; i++) {
-      var cell = spec.cells[i];
-      var rect = fbShift(cell.rect, dx, dy);
-      var ab = i === 0 ? doc.artboards[0] : doc.artboards.add(rect);
-      ab.artboardRect = rect;
-      ab.name = cell.name;
-      fbAddLetter(letters, cell, dx, dy, black);
-    }
-
-    for (var g = 0; g < spec.guides.length; g++) {
-      var gl = spec.guides[g];
-      var line = guides.pathItems.add();
-      line.setEntirePath([
-        [gl.x1 + dx, gl.y + dy],
-        [gl.x2 + dx, gl.y + dy]
-      ]);
-      line.guides = true;
-    }
-
-    for (var t = 0; t < spec.labels.length; t++) {
-      var lb = spec.labels[t];
-      var tf = guides.textFrames.add();
-      tf.contents = lb.text;
-      tf.textRange.characterAttributes.size = lb.size;
-      tf.textRange.characterAttributes.fillColor = lb.size > 20 ? accent : gray;
-      tf.position = [lb.x + dx, lb.y + dy];
-    }
-
-    var note = data.textFrames.add();
-    note.name = "fontbuilder-meta";
-    note.contents = spec.metaJson;
-    note.position = [b[0] + dx, b[3] + dy - 200];
-
-    guides.locked = true;
-    data.locked = true;
-    data.visible = false;
-
-    doc.artboards.setActiveArtboardIndex(0);
+/** Every text frame in the document that FontBuilder is previewing. */
+function fbTagged(doc) {
+  var out = [];
+  for (var i = 0; i < doc.textFrames.length; i++) {
+    var tf = doc.textFrames[i];
+    var n = "";
     try {
-      app.executeMenuCommand("fitin");
-    } catch (e1) {}
-    return "ok:" + spec.cells.length;
-  } catch (e) {
-    return "error:" + e.message + (e.line ? " (host.jsx line " + e.line + ")" : "");
+      n = tf.note || "";
+    } catch (e) {}
+    if (n.indexOf(FB_TAG) === 0) out.push(tf);
   }
+  return out;
 }
 
-/** Finds the active document's artboard for a letter and zooms to it. */
-function fbGoTo(name) {
+/** What the panel needs to set a text frame's text: its lines, size, start point, alignment. */
+function fbFrameJson(tf) {
+  var ca = tf.textRange.characterAttributes;
+  var size = ca.size;
+  var leading = ca.autoLeading ? size * 1.2 : ca.leading;
+  var just = "left";
   try {
-    if (!app.documents.length) return "error:Open your FontBuilder canvas first.";
+    var j = tf.textRange.paragraphAttributes.justification;
+    if (j === Justification.CENTER) just = "center";
+    else if (j === Justification.RIGHT) just = "right";
+  } catch (e) {}
+  var a = tf.anchor;
+  return (
+    '{"id":' + fbStr(tf.note.substr(FB_TAG.length)) +
+    ',"text":' + fbStr(tf.contents) +
+    ',"size":' + fbNum(size) +
+    ',"leading":' + fbNum(leading) +
+    ',"tracking":' + fbNum(ca.tracking || 0) +
+    ',"x":' + fbNum(a[0]) + ',"y":' + fbNum(a[1]) +
+    ',"just":' + fbStr(just) +
+    ',"area":' + (tf.kind === TextType.POINTTEXT ? "false" : "true") +
+    "}"
+  );
+}
+
+/** Tags the selected text frames for previewing and returns every previewed frame. */
+function fbPreviewAdd() {
+  try {
+    if (!app.documents.length) return "error:Open a document and select some text first.";
     var doc = app.activeDocument;
-    for (var i = 0; i < doc.artboards.length; i++) {
-      if (doc.artboards[i].name === name) {
-        doc.artboards.setActiveArtboardIndex(i);
+    var sel = doc.selection;
+    var added = 0;
+    if (sel && sel.length) {
+      for (var i = 0; i < sel.length; i++) {
+        var it = sel[i];
+        if (it.typename !== "TextFrame") continue;
+        var n = "";
         try {
-          app.executeMenuCommand("fitin");
+          n = it.note || "";
         } catch (e1) {}
-        return "ok:" + i;
+        if (n.indexOf(FB_TAG) !== 0) it.note = FB_TAG + new Date().getTime() + "-" + i;
+        added++;
       }
     }
-    return "error:This document has no artboard called " + name + ".";
+    if (!added && !fbTagged(doc).length) return "error:Select a text frame on your artboard first (with the Selection tool).";
+    return fbPreviewList();
   } catch (e) {
     return "error:" + e.message;
   }
 }
 
-/** Returns the project data saved in the active document, or "none" if it isn't a FontBuilder canvas. */
-function fbReadMeta() {
+/** Every previewed text frame in the active document, as JSON. */
+function fbPreviewList() {
   try {
-    if (!app.documents.length) return "none";
+    if (!app.documents.length) return 'ok:{"frames":[]}';
+    var tagged = fbTagged(app.activeDocument);
+    var parts = [];
+    for (var i = 0; i < tagged.length; i++) parts.push(fbFrameJson(tagged[i]));
+    return 'ok:{"frames":[' + parts.join(",") + "]}";
+  } catch (e) {
+    return "error:" + e.message;
+  }
+}
+
+function fbFindGroup(doc, id) {
+  for (var i = 0; i < doc.groupItems.length; i++) if (doc.groupItems[i].name === FB_GROUP + id) return doc.groupItems[i];
+  return null;
+}
+
+/**
+ * Draws the previewed text frames. `frames` is a list of { id, paths } where each path is a list
+ * of [x, y, inX, inY, outX, outY] anchors in document coordinates. Hides each text frame and puts
+ * its shapes in a group right above it, in the text's own fill colour.
+ */
+function fbPreviewDraw(frames) {
+  try {
+    if (!app.documents.length) return "ok:0";
     var doc = app.activeDocument;
-    var layer;
-    try {
-      layer = doc.layers.getByName(FB_DATA);
-    } catch (e1) {
-      return "none";
+    var tagged = fbTagged(doc);
+    var drawn = 0;
+    for (var f = 0; f < frames.length; f++) {
+      var fr = frames[f];
+      var tf = null;
+      for (var t = 0; t < tagged.length; t++) if (tagged[t].note === FB_TAG + fr.id) tf = tagged[t];
+      if (!tf) continue;
+      var wasLocked = tf.layer.locked;
+      tf.layer.locked = false;
+      var g = fbFindGroup(doc, fr.id);
+      if (!g) {
+        g = tf.layer.groupItems.add();
+        g.name = FB_GROUP + fr.id;
+        g.move(tf, ElementPlacement.PLACEBEFORE);
+      }
+      while (g.pageItems.length) g.pageItems[0].remove();
+      var color = tf.textRange.characterAttributes.fillColor;
+      if (fr.paths.length) {
+        var cp = g.compoundPathItems.add();
+        for (var i = 0; i < fr.paths.length; i++) {
+          var con = fr.paths[i];
+          var anchors = [];
+          for (var k = 0; k < con.length; k++) anchors.push([con[k][0], con[k][1]]);
+          var p = cp.pathItems.add();
+          p.setEntirePath(anchors);
+          p.closed = true;
+          for (var m = 0; m < con.length; m++) {
+            var pt = p.pathPoints[m];
+            pt.leftDirection = [con[m][2], con[m][3]];
+            pt.rightDirection = [con[m][4], con[m][5]];
+          }
+          p.stroked = false;
+          p.filled = true;
+          p.fillColor = color;
+          p.evenodd = false;
+        }
+      }
+      tf.hidden = true;
+      tf.layer.locked = wasLocked;
+      drawn++;
     }
-    for (var i = 0; i < layer.textFrames.length; i++) {
-      if (layer.textFrames[i].name === "fontbuilder-meta") return "ok:" + layer.textFrames[i].contents;
+    return "ok:" + drawn;
+  } catch (e) {
+    return "error:" + e.message + (e.line ? " (host.jsx line " + e.line + ")" : "");
+  }
+}
+
+/** Ends the preview: removes the drawn shapes and shows the text frames again, untouched. */
+function fbPreviewStop() {
+  try {
+    if (!app.documents.length) return "ok:0";
+    var doc = app.activeDocument;
+    var tagged = fbTagged(doc);
+    for (var i = 0; i < tagged.length; i++) {
+      var tf = tagged[i];
+      var id = tf.note.substr(FB_TAG.length);
+      var wasLocked = tf.layer.locked;
+      tf.layer.locked = false;
+      var g = fbFindGroup(doc, id);
+      if (g) g.remove();
+      tf.hidden = false;
+      tf.note = "";
+      tf.layer.locked = wasLocked;
     }
-    return "none";
+    return "ok:" + tagged.length;
   } catch (e) {
     return "error:" + e.message;
   }

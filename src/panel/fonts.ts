@@ -1,43 +1,17 @@
 /**
- * Finds fonts to start from: the open-licence fonts that ship with FontBuilder, and TrueType
- * fonts installed on the computer whose licence allows changes. Installed fonts are checked by
- * reading only their name table, so scanning a big font folder stays quick.
+ * Reads font files, and finds TrueType fonts installed on the computer whose licence allows
+ * changes. Installed fonts are checked by reading only their name table, so scanning a big font
+ * folder stays quick.
  */
 import { parseName } from "../font/parser";
 import { checkLicence, type LicenceInfo } from "../licence";
-import { extensionPath, nodeRequire } from "./cep";
+import { nodeRequire } from "./cep";
 
 export interface FontEntry {
-  id: string;
   label: string;
   family: string;
   style: string;
-  /** Where to read it: a file path inside Illustrator, or a URL in a browser. */
-  path: string | null;
-  url: string | null;
-  bundled: boolean;
-}
-
-export const BUNDLED: { dir: string; family: string }[] = [
-  { dir: "anybody", family: "Anybody" },
-  { dir: "bigshoulders", family: "Big Shoulders Display" },
-  { dir: "gasoek", family: "Gasoek One" },
-  { dir: "monasans", family: "Mona Sans" },
-  { dir: "sofia", family: "Sofia Sans Extra Condensed" },
-  { dir: "tiltwarp", family: "Tilt Warp" },
-];
-
-export function bundledFonts(): FontEntry[] {
-  const ext = extensionPath();
-  return BUNDLED.map((b) => ({
-    id: "bundled:" + b.dir,
-    label: b.family,
-    family: b.family,
-    style: "Regular",
-    path: ext ? `${ext}/fonts/${b.dir}/regular.ttf` : null,
-    url: ext ? null : `fonts/${b.dir}/regular.ttf`,
-    bundled: true,
-  }));
+  path: string;
 }
 
 /** Reads a font file's bytes, from disk inside Illustrator or over HTTP in a browser preview. */
@@ -109,7 +83,7 @@ export function installedOpenFonts(): FontEntry[] {
         if (!info || !info.licence.ok) continue;
         const family = info.names[16] || info.names[1] || file;
         const style = info.names[17] || info.names[2] || "Regular";
-        out.push({ id: "file:" + p, label: `${family} ${style}`, family, style, path: p, url: null, bundled: false });
+        out.push({ label: `${family} ${style}`, family, style, path: p });
       } catch {
         // Unreadable or damaged files are skipped.
       }
