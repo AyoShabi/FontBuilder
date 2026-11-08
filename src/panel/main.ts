@@ -11,6 +11,7 @@ import { STAGES, stageChars } from "../stages";
 import { chooseFontFile, inIllustrator, runHost } from "./cep";
 import { bundledFonts, installedOpenFonts, readFontBytes, type FontEntry } from "./fonts";
 import { escapeAttr, textSvg } from "./preview";
+import { build, loadSource, nameProblem, readCanvas, readNotes, save } from "./exporter";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -123,6 +124,7 @@ async function createCanvas() {
 /** The letters of the open canvas, by stage, as buttons that jump to each artboard. */
 function renderLetters() {
   const box = $("letters");
+  $("export").hidden = !canvas;
   if (!canvas) {
     box.hidden = true;
     return;
@@ -136,6 +138,64 @@ function renderLetters() {
       <div class="keys">${chars.map((ch) => `<button type="button" class="key" data-name="${escapeAttr(have.get(ch)!)}" title="Go to ${escapeAttr(ch)}">${escapeAttr(ch)}</button>`).join("")}</div></section>`;
   }).join("");
   $("canvasname").textContent = `${canvas.source.family} ${canvas.source.style}`;
+}
+
+/** The source font of the open canvas, loaded once per canvas. */
+let source: { key: string; font: Font; path: string | null } | null = null;
+
+async function canvasSource() {
+  if (!canvas) throw new Error("Open your FontBuilder canvas first.");
+  const key = `${canvas.source.path}|${canvas.source.family}|${canvas.source.style}`;
+  if (!source || source.key !== key) source = { key, ...(await loadSource(canvas)) };
+  return source;
+}
+
+function naming() {
+  return { family: $<HTMLInputElement>("family").value, style: $<HTMLInputElement>("style").value || "Regular" };
+}
+
+async function checkName(): Promise<boolean> {
+  const el = $("nameproblem");
+  try {
+    const { font } = await canvasSource();
+    const problem = nameProblem(font, naming());
+    el.textContent = problem || "";
+    el.hidden = !problem;
+    return !problem;
+  } catch (err) {
+    el.textContent = (err as Error).message;
+    el.hidden = false;
+    return false;
+  }
+}
+
+/** Reads the canvas and builds the font. With `andSave`, also asks where to save it. */
+async function exportFont(andSave: boolean) {
+  if (!canvas || !(await checkName())) return;
+  const buttons = [$<HTMLButtonElement>("check"), $<HTMLButtonElement>("save")];
+  buttons.forEach((b) => (b.disabled = true));
+  setStatus("Reading your letters from the canvas…");
+  try {
+    const { font, path } = await canvasSource();
+    const read = await readCanvas(canvas);
+    const n = naming();
+    const result = build(font, canvas, read, n);
+    const built = parseFont(result.bytes.slice().buffer as ArrayBuffer);
+    $("result").hidden = false;
+    $("outpreview").innerHTML = textSvg(built, "Hamburgefonstiv", 44) + textSvg(built, "HOHO nono 0123", 28);
+    $("notes").innerHTML = readNotes(read, result.empty).map((t) => `<li>${escapeAttr(t)}</li>`).join("");
+    if (!andSave) {
+      setStatus("This is how your font sets right now.", "ok");
+      return;
+    }
+    const file = save(result.bytes, n, path, font);
+    if (!file) return setStatus("");
+    setStatus(`Saved ${file}, with its licence next to it. To use it, right-click the file and choose Install (on a Mac, double-click it). Keep the licence file with the font when you share it.`, "ok");
+  } catch (err) {
+    setStatus((err as Error).message, "error");
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+  }
 }
 
 async function checkOpenCanvas() {
@@ -175,6 +235,10 @@ function wire() {
     }
   });
   $("refresh").addEventListener("click", checkOpenCanvas);
+  $("check").addEventListener("click", () => exportFont(false));
+  $("save").addEventListener("click", () => exportFont(true));
+  $("family").addEventListener("change", checkName);
+  $("style").addEventListener("change", checkName);
 }
 
 function init() {

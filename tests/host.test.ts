@@ -5,103 +5,13 @@
  */
 import { parse } from "acorn";
 import { readFileSync } from "node:fs";
-import { createContext, runInContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { layoutCanvas } from "../src/canvas/layout";
 import { hostCall } from "../src/canvas/script";
 import { loadFont } from "./helpers";
+import { fakeIllustrator } from "./fakeIllustrator";
 
 const HOST = readFileSync("extension/jsx/host.jsx", "utf8");
-
-type Pt = { anchor: number[]; leftDirection: number[]; rightDirection: number[]; pointType: string };
-
-function collection<T>(make: () => T) {
-  const items: T[] = [] as T[];
-  const c = items as T[] & { add: (...a: unknown[]) => T; getByName: (n: string) => T };
-  c.add = () => {
-    const it = make();
-    items.push(it);
-    return it;
-  };
-  c.getByName = (n: string) => {
-    const f = items.find((x) => (x as { name?: string }).name === n);
-    if (!f) throw new Error("No such element");
-    return f;
-  };
-  return c;
-}
-
-function makePath() {
-  const p = {
-    pathPoints: [] as Pt[],
-    closed: false,
-    guides: false,
-    setEntirePath(a: number[][]) {
-      p.pathPoints = a.map((q) => ({ anchor: q, leftDirection: q, rightDirection: q, pointType: "CORNER" }));
-    },
-  };
-  return p;
-}
-
-function makeText() {
-  return { contents: "", name: "", position: [0, 0], textRange: { characterAttributes: {} } };
-}
-
-function makeLayer() {
-  const l = {
-    name: "",
-    locked: false,
-    visible: true,
-    moved: null as unknown,
-    pathItems: collection(makePath),
-    textFrames: collection(makeText),
-    compoundPathItems: collection(() => ({ name: "", pathItems: collection(makePath) })),
-    move(_rel: unknown, where: string) {
-      l.moved = where;
-    },
-  };
-  return l;
-}
-
-function fakeIllustrator() {
-  const docs: ReturnType<typeof makeDoc>[] = [];
-  function makeDoc(w: number, h: number) {
-    const abs = collection(() => ({ name: "", artboardRect: [0, 0, 0, 0] }));
-    abs.add();
-    abs[0].artboardRect = [0, h, w, 0];
-    const orig = abs.add;
-    (abs as unknown as { add: (r: number[]) => unknown }).add = (r: number[]) => {
-      const a = orig();
-      a.artboardRect = r;
-      return a;
-    };
-    const layers = collection(makeLayer);
-    layers.add();
-    return { artboards: Object.assign(abs, { active: 0, setActiveArtboardIndex: (i: number) => ((abs as unknown as { active: number }).active = i) }), layers };
-  }
-  const app = {
-    documents: Object.assign(docs, {
-      add: (_cs: unknown, w: number, h: number) => {
-        const d = makeDoc(w, h);
-        docs.push(d);
-        app.activeDocument = d;
-        return d;
-      },
-    }),
-    activeDocument: null as unknown,
-    commands: [] as string[],
-    executeMenuCommand: (c: string) => app.commands.push(c),
-  };
-  const ctx = createContext({
-    app,
-    RGBColor: function RGBColor() {},
-    DocumentColorSpace: { RGB: "RGB" },
-    ElementPlacement: { PLACEAFTER: "PLACEAFTER" },
-    PointType: { SMOOTH: "SMOOTH", CORNER: "CORNER" },
-  });
-  runInContext(HOST, ctx);
-  return { app, run: (s: string) => runInContext(s, ctx) as string };
-}
 
 describe("host.jsx", () => {
   it("is ES3", () => {

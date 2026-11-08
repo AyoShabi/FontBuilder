@@ -5,7 +5,7 @@ it out on a new canvas with one artboard per letter. You redraw the letters with
 tools, guided stage by stage, and (from step 2 of the build) export the result as a new font for
 your brand.
 
-## What works now (step 1)
+## What works now (steps 1 and 2)
 
 - **Choose a starting font**: six open-licence fonts come with FontBuilder, the panel finds TrueType
   fonts installed on your computer whose licence allows changes, or you can choose a `.ttf` file.
@@ -17,9 +17,19 @@ your brand.
   ascender, cap height, x-height, baseline and descender are on the locked **Guides** layer.
   Curves are converted exactly, so letters look identical to the font.
 - **Your letters**: jump to any letter's artboard from the panel.
+- **Export your font**: give it a name and style, preview it, and save a `.ttf` with a licence file
+  next to it. FontBuilder reads every filled shape on the Letters layer and assigns it to the
+  artboard its middle sits on. The artboard's width is the letter's spacing, so resizing it with the
+  Artboard tool changes the space around the letter. Shapes keep the fill Illustrator shows (holes
+  in compound paths stay holes, overlapping shapes join), and curves are converted to the font's
+  curves within one font unit. Letters not on the canvas, kerning and other features carry over
+  from the original. The name is checked against the licence's Reserved Font Names, and the
+  original copyright and licence are kept in the font.
 
-Coming next: export to a font file with your brand's name (step 2), the full stage guide with test
-words and progress (step 3), group changes and spacing (step 4), signed installer (step 5).
+Stroke-only shapes, live text and images aren't included; the panel lists any it skipped.
+
+Coming next: the full stage guide with test words and progress (step 3), group changes and
+spacing (step 4), signed installer (step 5).
 
 ## Install (Windows)
 
@@ -42,8 +52,10 @@ npm run build     # builds dist/FontBuilder plus the install scripts
 
 - `extension/` is the CEP extension: `CSXS/manifest.xml`, the panel page, `jsx/host.jsx` (the
   ExtendScript that runs inside Illustrator, ES3 only) and the bundled fonts with their OFL texts.
-- `src/font/` reads TrueType fonts. `src/canvas/` turns a font into the canvas layout and converts
-  TrueType curves into Illustrator's anchors and handles. `src/panel/` is the panel UI.
+- `src/font/` reads and writes TrueType fonts. `src/canvas/` turns a font into the canvas layout
+  and converts TrueType curves into Illustrator's anchors and handles. `src/export/` goes the other
+  way: Illustrator paths back into TrueType contours, then the finished font. `src/panel/` is the
+  panel UI.
 - With the extension installed, the panel can be inspected at http://localhost:8088 in Chrome
   (set in `extension/.debug`).
 

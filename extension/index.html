@@ -47,6 +47,22 @@
       <div id="letterlist"></div>
     </section>
 
+    <section class="card" id="export" hidden>
+      <h2>3. Export your font</h2>
+      <p class="muted">FontBuilder reads every filled shape on the Letters layer, letter by artboard. An artboard's width is the letter's spacing, so resize it with the Artboard tool to change the space around a letter.</p>
+      <label class="field"><span>Font name</span><input id="family" type="text" placeholder="e.g. Umba Display" autocomplete="off" /></label>
+      <label class="field"><span>Style</span><input id="style" type="text" value="Regular" autocomplete="off" /></label>
+      <p id="nameproblem" class="small problem" hidden></p>
+      <div class="row">
+        <button type="button" id="check" class="secondary">Preview</button>
+        <button type="button" id="save" class="primary inline">Export font…</button>
+      </div>
+      <div id="result" hidden>
+        <div id="outpreview" class="preview"></div>
+        <ul id="notes" class="notes"></ul>
+      </div>
+    </section>
+
     <script src="js/panel.js"></script>
   </body>
 </html>

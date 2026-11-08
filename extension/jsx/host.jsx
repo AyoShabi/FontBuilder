@@ -172,3 +172,121 @@ function fbReadMeta() {
     return "error:" + e.message;
   }
 }
+
+/** A string as a JSON string literal (ExtendScript has no JSON object). */
+function fbStr(s) {
+  return '"' + String(s).replace(/[\\"]/g, "\\$&").replace(/[\u0000-\u001f]/g, "") + '"';
+}
+
+/** Rounds to 1/1000 of a point and prints a number JSON accepts. */
+function fbNum(v) {
+  var r = Math.round(v * 1000) / 1000;
+  return isFinite(r) ? String(r) : "0";
+}
+
+/**
+ * Collects the shapes under an item: a path on its own, or a compound path's paths together
+ * (so its holes stay holes), and everything inside groups. Notes things that won't be in the font.
+ */
+function fbCollect(item, out, notes) {
+  if (item.hidden) return;
+  var t = item.typename;
+  if (t === "PathItem") {
+    if (item.guides || item.clipping) return;
+    if (!item.filled && item.stroked) {
+      notes.push("stroke");
+      return;
+    }
+    if (item.pathPoints.length >= 2) out.push({ item: item, paths: [item], eo: !!item.evenodd });
+  } else if (t === "CompoundPathItem") {
+    var ps = [];
+    for (var i = 0; i < item.pathItems.length; i++) {
+      var p = item.pathItems[i];
+      if (p.pathPoints.length >= 2 && !p.guides) ps.push(p);
+    }
+    if (ps.length) out.push({ item: item, paths: ps, eo: !!ps[0].evenodd });
+  } else if (t === "GroupItem") {
+    for (var g = 0; g < item.pageItems.length; g++) fbCollect(item.pageItems[g], out, notes);
+  } else if (t === "TextFrame") {
+    notes.push("text");
+  } else {
+    notes.push("other");
+  }
+}
+
+function fbPathJson(path, ox, oy) {
+  var pts = path.pathPoints;
+  var arr = [];
+  for (var m = 0; m < pts.length; m++) {
+    var pt = pts[m];
+    arr.push(
+      "[" +
+        fbNum(pt.anchor[0] - ox) + "," + fbNum(pt.anchor[1] - oy) + "," +
+        fbNum(pt.leftDirection[0] - ox) + "," + fbNum(pt.leftDirection[1] - oy) + "," +
+        fbNum(pt.rightDirection[0] - ox) + "," + fbNum(pt.rightDirection[1] - oy) +
+        "]"
+    );
+  }
+  return "[" + arr.join(",") + "]";
+}
+
+/**
+ * Reads every letter off the active FontBuilder canvas. Each shape on the Letters layer belongs
+ * to the artboard its middle sits on. Coordinates come back relative to the
+ * letter's origin: the artboard's left edge, `above` points below the artboard's top (the baseline).
+ */
+function fbReadLetters(above) {
+  try {
+    if (!app.documents.length) return "error:Open your FontBuilder canvas first.";
+    var doc = app.activeDocument;
+    var layer;
+    try {
+      layer = doc.layers.getByName(FB_LETTERS);
+    } catch (e1) {
+      return "error:This document has no Letters layer. Open the canvas FontBuilder made.";
+    }
+    var shapes = [];
+    var notes = [];
+    for (var i = 0; i < layer.pageItems.length; i++) fbCollect(layer.pageItems[i], shapes, notes);
+
+    var abs = [];
+    for (var a = 0; a < doc.artboards.length; a++) abs.push({ name: doc.artboards[a].name, r: doc.artboards[a].artboardRect, shapes: [] });
+
+    var outside = 0;
+    for (var p = 0; p < shapes.length; p++) {
+      var b = shapes[p].item.geometricBounds; // [left, top, right, bottom]
+      var cx = (b[0] + b[2]) / 2;
+      var cy = (b[1] + b[3]) / 2;
+      var home = null;
+      for (var k = 0; k < abs.length; k++) {
+        var r = abs[k].r;
+        if (cx >= r[0] && cx <= r[2] && cy <= r[1] && cy >= r[3]) {
+          home = abs[k];
+          break;
+        }
+      }
+      if (home) home.shapes.push(shapes[p]);
+      else outside++;
+    }
+
+    var parts = [];
+    for (var n = 0; n < abs.length; n++) {
+      var ab = abs[n];
+      var ox = ab.r[0];
+      var oy = ab.r[1] - above;
+      var sj = [];
+      for (var q = 0; q < ab.shapes.length; q++) {
+        var sh = ab.shapes[q];
+        var pj = [];
+        for (var w = 0; w < sh.paths.length; w++) pj.push(fbPathJson(sh.paths[w], ox, oy));
+        sj.push('{"evenodd":' + (sh.eo ? "true" : "false") + ',"paths":[' + pj.join(",") + "]}");
+      }
+      parts.push('{"name":' + fbStr(ab.name) + ',"width":' + fbNum(ab.r[2] - ab.r[0]) + ',"shapes":[' + sj.join(",") + "]}");
+    }
+    var noteList = [];
+    for (var z = 0; z < notes.length; z++) noteList.push(fbStr(notes[z]));
+    return 'ok:{"letters":[' + parts.join(",") + '],"notes":[' + noteList.join(",") + '],"outside":' + outside + "}";
+  } catch (e) {
+    return "error:" + e.message + (e.line ? " (host.jsx line " + e.line + ")" : "");
+  }
+}

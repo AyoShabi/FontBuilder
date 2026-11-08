@@ -91,6 +91,11 @@ export function artboardName(ch: string): string {
   return NAMES[ch] || ch;
 }
 
+/** Distance in points from an artboard's top edge down to the baseline, for a canvas's saved data. */
+export function baselineFromTop(meta: Pick<CanvasMeta, "metrics" | "upm" | "scale">): number {
+  return (meta.metrics.asc + PAD * meta.upm) * meta.scale;
+}
+
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 export interface LayoutOptions {
