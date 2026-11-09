@@ -7,6 +7,7 @@
 import type { Font } from "../font/types";
 import type { GlyphGroup } from "./groups";
 import type { Project } from "./project";
+import { isDrawn } from "./charset";
 
 export interface StageFamily {
   name: string;
@@ -78,8 +79,8 @@ export function stageChars(s: Stage): string[] {
 const gidOf = (f: Font, ch: string) => f.cmap.get(ch.codePointAt(0)!);
 
 /** Characters of a stage that the font has. */
-export function presentChars(f: Font, s: Stage): string[] {
-  return stageChars(s).filter((ch) => gidOf(f, ch) != null);
+export function presentChars(f: Font, s: Stage, p?: Project): string[] {
+  return stageChars(s).filter((ch) => (p ? isDrawn(f, p, ch.codePointAt(0)!) : gidOf(f, ch) != null));
 }
 
 export const stageGroupId = (si: number, fi: number) => `stage:${STAGES[si].id}:${fi}`;
@@ -110,7 +111,7 @@ export function toggleReviewed(p: Project, ch: string): boolean {
 
 /** How many of a stage's letters (that the font has) are reviewed. */
 export function stageProgress(f: Font, p: Project, s: Stage): { done: number; total: number } {
-  const chars = presentChars(f, s);
+  const chars = presentChars(f, s, p);
   return { done: chars.filter((ch) => isReviewed(p, ch)).length, total: chars.length };
 }
 
@@ -125,7 +126,7 @@ export function firstOpenStage(f: Font, p: Project): number {
 
 /** The next letter in the stage after `from` that isn't reviewed, wrapping round. Null when all are. */
 export function nextOpenChar(f: Font, p: Project, s: Stage, from: string | null): string | null {
-  const chars = presentChars(f, s);
+  const chars = presentChars(f, s, p);
   const start = from ? chars.indexOf(from) + 1 : 0;
   for (let k = 0; k < chars.length; k++) {
     const ch = chars[(start + k) % chars.length];

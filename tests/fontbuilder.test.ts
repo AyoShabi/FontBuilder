@@ -1,6 +1,6 @@
 /** FontBuilder's additions to the editor: bending lines, font-wide heights, and the artboard preview. */
 import { parse } from "acorn";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { bendLine } from "../src/editor/edits";
@@ -208,5 +208,77 @@ describe("Illustrator-style editing", () => {
     expect(ks).toContainEqual({ keyCode: 67, shiftKey: true }); // Shift+C
     expect(ks).toContainEqual({ keyCode: 187, ctrlKey: true }); // Ctrl+=
     expect(ks).toContainEqual({ keyCode: 90, ctrlKey: true, shiftKey: true }); // redo
+  });
+});
+
+describe("Characters and shapes", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+
+  it("a capitals-only font types capitals for lowercase, and survives export", async () => {
+    const { outputCmap, isDrawn } = await import("../src/editor/charset");
+    const f = load("passionone");
+    const p = { ...newProject(), letterCase: "upper" as const };
+    const m = outputCmap(f, p);
+    expect(m.get(97)).toBe(f.cmap.get(65)); // a -> A
+    expect(m.get(65)).toBe(f.cmap.get(65));
+    expect(isDrawn(f, p, 97)).toBe(false);
+    expect(isDrawn(f, p, 65)).toBe(true);
+    const back = parseFont(buildFont(f, "Test Caps", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.cmap.get(97)).toBe(f.cmap.get(65));
+    expect(back.cmap.get(0x31)).toBe(f.cmap.get(0x31));
+  });
+
+  it("a lowercase-only font types lowercase for capitals", async () => {
+    const { outputCmap } = await import("../src/editor/charset");
+    const f = load("passionone");
+    const m = outputCmap(f, { ...newProject(), letterCase: "lower" });
+    expect(m.get(72)).toBe(f.cmap.get(104)); // H -> h
+  });
+
+  it("the basic set leaves accented letters and symbols out", async () => {
+    const { outputCmap } = await import("../src/editor/charset");
+    const f = load("passionone");
+    expect(f.cmap.has(0xe9)).toBe(true); // é in the starting font
+    const p = { ...newProject(), charset: "basic" as const };
+    const back = parseFont(buildFont(f, "Test Basic", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.cmap.has(0xe9)).toBe(false);
+    expect(back.cmap.get(0x41)).toBe(f.cmap.get(0x41));
+    expect(back.cmap.has(0xa3)).toBe(f.cmap.has(0xa3)); // £ stays
+    expect(outputCmap(f, p).size).toBe(back.cmap.size);
+  });
+
+  it("draws a filled rectangle and a cut-out ellipse into a letter", async () => {
+    const { addShape } = await import("../src/editor/edits");
+    const { rectPoints, ellipsePoints, signedArea, fillDirection } = await import("../src/editor/outline");
+    state.store.slug = "passionone";
+    state.store.loc = { wght: 700 };
+    state.font = load("passionone");
+    state.store.projects.passionone = newProject();
+    const gid = state.font.cmap.get(72)!; // H
+    setCurrentGid(gid);
+    const before = editedOutline(state.font, gid, proj());
+    const dir = fillDirection(before);
+    expect(addShape(rectPoints(0, 700, 200, 800), false)).toBe(true);
+    let o = editedOutline(state.font, gid, proj());
+    expect(o.ends.length).toBe(before.ends.length + 1);
+    const rect = o.pts.slice(before.pts.length);
+    expect(Math.sign(signedArea(rect))).toBe(dir);
+    expect(rect.map((q) => [q.x, q.y])).toContainEqual([200, 800]);
+    expect(addShape(ellipsePoints(300, 300, 50, 80), true)).toBe(true);
+    o = editedOutline(state.font, gid, proj());
+    const ell = o.pts.slice(before.pts.length + 4);
+    expect(ell.length).toBe(16);
+    expect(Math.sign(signedArea(ell))).toBe(-dir);
+    // It exports and reads back.
+    const back = parseFont(buildFont(state.font, "Test Shapes", outlineSource(state.font, proj())).buffer as ArrayBuffer);
+    const G = back.glyphs[gid];
+    expect(G.type === "simple" && G.ends.length).toBe(before.ends.length + 2);
+    undo();
+    expect(editedOutline(state.font, gid, proj()).ends.length).toBe(before.ends.length + 1);
   });
 });

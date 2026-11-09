@@ -7,7 +7,8 @@ export const PANEL_KEYS = [
   8, 27, 32, 37, 38, 39, 40, 46, // Backspace Esc Space arrows Delete
   48, 96, // 0 and numpad 0 (Ctrl+0 fits the letter)
   187, 107, 189, 109, 61, 173, // = + - on the main keys and the numpad (and Firefox-style codes)
-  65, 67, 80, 86, 89, 90, // A C P V Y Z
+  13, // Enter (closes a Pen shape)
+  65, 67, 76, 77, 80, 86, 89, 90, // A C L M P V Y Z
 ];
 
 export function keyInterest(): Record<string, unknown>[] {

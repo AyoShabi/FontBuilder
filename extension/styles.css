@@ -115,6 +115,13 @@ kbd{font:10px var(--mono);color:var(--muted);margin-left:3px}
 #stage[data-tool=remove] .p{cursor:not-allowed}
 #stage[data-tool=hand],#stage[data-tool=hand] .p{cursor:grab}
 #stage .addpv{fill:none;stroke:var(--sky);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none}
+#stage .draft{fill:rgba(124,200,255,.18);stroke:var(--sky);stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none}
+#stage .draft.open{fill:none;stroke-dasharray:5 4}
+#stage .penpt{fill:var(--bg);stroke:var(--sky);stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none}
+#stage .penpt.first{fill:var(--sky)}
+#stage[data-tool=rect],#stage[data-tool=ellipse]{cursor:crosshair}
+.cutbox{display:flex;align-items:center;gap:4px;color:var(--muted)}
+.seg.wide{display:flex}.seg.wide button{flex:1 1 0}
 #stage .marq{fill:rgba(168,226,255,.12);stroke:var(--sky);stroke-width:1;vector-effect:non-scaling-stroke}
 
 /* Settings column */

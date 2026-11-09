@@ -6,8 +6,8 @@ import { bbox } from "../font/geometry";
 import type { BBox, Font, Point } from "../font/types";
 import { ZONES, zonePts, type CustomGroup, type Zone } from "./groups";
 import { pushUndo } from "./history";
-import { applyOp, deleteOps, isLine, splitIndex, type Outline, type OutlineOp } from "./outline";
-import { advOf, baseOutline, cleanEdit, contours, editedPts } from "./project";
+import { applyOp, deleteOps, isLine, shapeOp, splitIndex, type Outline, type OutlineOp } from "./outline";
+import { advOf, baseOutline, cleanEdit, contours, editedPts, heightMapper, trackingShift } from "./project";
 import { currentGid, font, glyphEdit, linkedGids, proj, state } from "./state";
 
 export type PointMap = (q: Point, box: BBox) => { x: number; y: number };
@@ -203,6 +203,35 @@ export function bendLine(i: number): number | null {
   if (!applyStructural([{ bend: i }])) return null;
   state.selPts = new Set([i + 1]);
   return i + 1;
+}
+
+/**
+ * Adds a closed shape to the current glyph: filled, or cutting a hole where it overlaps.
+ * The new shape's points are selected, so it can be moved straight away. Returns false if the glyph can't take it.
+ */
+export function addShape(pts: Point[], cut: boolean): boolean {
+  const base = baseOutline(font(), currentGid(), proj());
+  if (!base?.fits || pts.length < 3) return false;
+  const gid = currentGid();
+  const p = proj();
+  const first = base.pts.length;
+  const op = shapeOp(base, pts, cut);
+  if (!applyStructural([op])) return false;
+  // The shape is stored where it was drawn, before the letter's shift and height changes are
+  // applied; offsets put it back exactly under the pointer.
+  const sh = (p.edits[gid]?.shift || 0) + trackingShift(p);
+  const my = heightMapper(font(), gid, p);
+  const e = glyphEdit(gid);
+  e.pts = e.pts || {};
+  for (let k = 0; k < op.shape.length / 3; k++) {
+    const y = op.shape[k * 3 + 1];
+    const dx = -sh;
+    const dy = my ? Math.round(y - my(y)) : 0;
+    if (dx || dy) e.pts[first + k] = [dx, dy];
+  }
+  cleanEdit(e);
+  state.selPts = new Set(pts.map((_, k) => first + k));
+  return true;
 }
 
 /** Removes the selected points of the current glyph. */

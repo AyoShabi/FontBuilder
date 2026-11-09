@@ -17,7 +17,9 @@ brand's own font.
   | Key | Does |
   | --- | --- |
   | V or A | Select and move points |
-  | P or + (or hold Alt) | Add a point on the outline |
+  | P (Pen) or + (or hold Alt) | Click the outline to add a point; click in empty space to draw a new shape (click the first corner or press Enter to close it, Esc cancels) |
+  | M, L | Rectangle, Ellipse: drag to draw (Shift: square or circle, Alt: from the centre) |
+  | Cut out (tick box) | New shapes cut a hole where they overlap the letter |
   | − | Delete the point you click |
   | Shift+C (or C) | Curve: drag a straight line to bend it |
   | Shift while dragging | Keep the move horizontal, vertical or at 45° |
@@ -31,6 +33,9 @@ brand's own font.
   | Ctrl+A, Ctrl+Shift+A, Esc | Select all, deselect |
   | Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
 
+- **Characters**: draw capitals only, lowercase only or both. In a capitals-only font, typing
+  lowercase gives the capitals (and the other way round). **Basic** keeps A–Z, a–z, 0–9 and
+  everyday punctuation and leaves accented letters and symbols out of the font.
 - **Heights**: sliders for ascender, cap height, x-height and descender. Each one changes every
   letter at once, and the baseline stays put.
 - **Spacing and shape**: set the left and right space and the width of a letter, or reshape it

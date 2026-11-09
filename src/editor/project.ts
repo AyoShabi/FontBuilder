@@ -1,4 +1,5 @@
 import type { OutlineSource } from "../font/writer";
+import { isDefaultCharset, outputCmap, type Charset, type LetterCase } from "./charset";
 import type { Font, Point } from "../font/types";
 import type { CustomGroup } from "./groups";
 import { applyOps, type Outline, type OutlineOp } from "./outline";
@@ -42,6 +43,10 @@ export interface Project {
   stage?: number;
   /** Characters the user has marked as reviewed, stored as characters so they survive other cuts. */
   reviewed?: string;
+  /** Capitals only, lowercase only, or both (the default). See charset.ts. */
+  letterCase?: LetterCase;
+  /** The starting font's full character set (the default), or just the basic one. */
+  charset?: Charset;
 }
 
 export const DEFAULT_FAMILY = "Brand Display";
@@ -227,5 +232,6 @@ export function outlineSource(font: Font, p: Project): OutlineSource {
     contours: (gid) => contours(font, gid, p),
     advance: (gid) => advOf(font, gid, p),
     heights: hasHeights(p) ? newHeights(font, p) : undefined,
+    cmap: isDefaultCharset(p) ? undefined : outputCmap(font, p),
   };
 }

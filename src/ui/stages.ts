@@ -2,6 +2,7 @@
 import { selectZone } from "../editor/edits";
 import { pushUndo } from "../editor/history";
 import { isEdited } from "../editor/project";
+import { isDrawn } from "../editor/charset";
 import {
   STAGES,
   firstOpenStage,
@@ -18,7 +19,7 @@ import { $, escapeHtml } from "./dom";
 /** The stage being worked on. A project that never picked one starts at the first unfinished stage. */
 export function currentStage(): number {
   const p = proj();
-  if (p.stage == null || !STAGES[p.stage]) p.stage = firstOpenStage(font(), p);
+  if (p.stage == null || !STAGES[p.stage] || !stageProgress(font(), p, STAGES[p.stage]).total) p.stage = firstOpenStage(font(), p);
   return p.stage;
 }
 
@@ -37,6 +38,8 @@ export function renderStages(): void {
   $("#stepper").innerHTML = STAGES.map((st, i) => {
     const { done, total } = stageProgress(f, p, st);
     const complete = total > 0 && done === total;
+    if (!total)
+      return `<li><button data-stage="${i}" disabled title="Not part of your font's characters"><span class="n">${i + 1}</span><span class="t">${escapeHtml(st.title)}</span><span class="pg">Not used</span></button></li>`;
     return `<li><button data-stage="${i}" class="${complete ? "done" : ""}"${i === si ? ' aria-current="step"' : ""}>
       <span class="n">${complete ? "✓" : i + 1}</span><span class="t">${escapeHtml(st.title)}</span>
       <span class="pg">${done} of ${total} reviewed</span></button></li>`;
@@ -46,7 +49,9 @@ export function renderStages(): void {
 
   $("#stageFams").innerHTML = s.families
     .map((fam, fi) => {
-      const letters = [...fam.chars]
+      const shown = [...fam.chars].filter((ch) => !f.cmap.has(ch.codePointAt(0)!) || isDrawn(f, p, ch.codePointAt(0)!));
+      if (!shown.some((ch) => f.cmap.has(ch.codePointAt(0)!))) return "";
+      const letters = shown
         .map((ch) => {
           const gid = f.cmap.get(ch.codePointAt(0)!);
           if (gid == null) return `<button class="sl missing" disabled title="Not in this font">${escapeHtml(ch)}</button>`;
@@ -55,7 +60,7 @@ export function renderStages(): void {
           return `<button class="${cls.filter(Boolean).join(" ")}" data-g="${gid}" title="${tip}">${escapeHtml(ch)}</button>`;
         })
         .join("");
-      const present = [...fam.chars].filter((ch) => f.cmap.has(ch.codePointAt(0)!)).length;
+      const present = shown.filter((ch) => f.cmap.has(ch.codePointAt(0)!)).length;
       const id = stageGroupId(si, fi);
       const link =
         present > 1

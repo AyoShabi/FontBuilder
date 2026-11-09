@@ -24,7 +24,9 @@ export type OutlineOp =
   /** Remove point `del`. With `join`, an on-curve point between two off-curves is removed and the two curves merged into one. */
   | { del: number; join?: boolean }
   /** Turn the straight line from on-curve point `bend` to the next on-curve point into a curve, with its control point halfway along. */
-  | { bend: number };
+  | { bend: number }
+  /** Add a new closed shape after the last contour, as flat [x, y, on (1 or 0), ...] in font units. */
+  | { shape: number[] };
 
 type XY = { x: number; y: number };
 const lerp = (a: XY, b: XY, t: number): XY => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
@@ -163,7 +165,70 @@ export function isLine(o: Outline, i: number): boolean {
   return !!n && n.next !== i && o.pts[i].on && o.pts[n.next].on;
 }
 
+/** Appends a closed shape as a new contour. Existing point numbers don't change. */
+function shape(o: Outline, flat: number[]): Outline | null {
+  if (flat.length < 9 || flat.length % 3) return null;
+  const add: Point[] = [];
+  for (let k = 0; k < flat.length; k += 3) add.push({ x: flat[k], y: flat[k + 1], on: !!flat[k + 2] });
+  return { ends: [...o.ends, o.pts.length + add.length - 1], pts: [...o.pts, ...add] };
+}
+
+/** Twice the signed area of a contour (positive when it runs anticlockwise, y up). */
+export function signedArea(pts: XY[]): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a;
+}
+
+/**
+ * Which way the glyph's filled shapes run: the direction of its biggest contour (TrueType fonts
+ * draw outer shapes clockwise, but converted fonts can run the other way). +1 anticlockwise, -1 clockwise.
+ */
+export function fillDirection(o: Outline): 1 | -1 {
+  let best = 0;
+  let s = 0;
+  for (const e of o.ends) {
+    const a = signedArea(o.pts.slice(s, e + 1));
+    if (Math.abs(a) > Math.abs(best)) best = a;
+    s = e + 1;
+  }
+  return best > 0 ? 1 : -1;
+}
+
+/**
+ * A new shape's points, running so that it fills (`cut` false) or cuts a hole where it overlaps
+ * the letter (`cut` true), as a shape op.
+ */
+export function shapeOp(o: Outline, pts: Point[], cut: boolean): { shape: number[] } {
+  const want = fillDirection(o) * (cut ? -1 : 1);
+  const run = Math.sign(signedArea(pts)) === want ? pts : [...pts].reverse();
+  return { shape: run.flatMap((q) => [Math.round(q.x), Math.round(q.y), q.on ? 1 : 0]) };
+}
+
+/** A rectangle's corners. */
+export function rectPoints(x0: number, y0: number, x1: number, y1: number): Point[] {
+  return [on({ x: x0, y: y0 }), on({ x: x1, y: y0 }), on({ x: x1, y: y1 }), on({ x: x0, y: y1 })];
+}
+
+/** An ellipse in eight quadratic curves (within about 0.1% of a true ellipse). */
+export function ellipsePoints(cx: number, cy: number, rx: number, ry: number): Point[] {
+  const out: Point[] = [];
+  const k = 1 / Math.cos(Math.PI / 8);
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    const m = a + Math.PI / 8;
+    out.push(on({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }));
+    out.push(off({ x: cx + rx * k * Math.cos(m), y: cy + ry * k * Math.sin(m) }));
+  }
+  return out;
+}
+
 export function applyOp(o: Outline, op: OutlineOp): Outline | null {
+  if ("shape" in op) return shape(o, op.shape);
   if ("split" in op) return split(o, op.split, op.t);
   if ("bend" in op) return bend(o, op.bend);
   return del(o, op.del, !!op.join);

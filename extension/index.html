@@ -53,10 +53,13 @@
       <div class="edhead">
         <div class="seg" role="group" aria-label="Tool">
           <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select <kbd>V</kbd></button>
-          <button id="toolAdd" aria-pressed="false" title="Click the outline to add a point (P or +)">Add point <kbd>+</kbd></button>
+          <button id="toolAdd" aria-pressed="false" title="Pen (P): click the outline to add a point, or click in empty space to draw a new shape. Click the first corner or press Enter to close it.">Pen <kbd>P</kbd></button>
           <button id="toolRemove" aria-pressed="false" title="Click a point to delete it (-)">Delete point <kbd>−</kbd></button>
           <button id="toolBend" aria-pressed="false" title="Drag a straight line to curve it (Shift+C)">Curve <kbd>⇧C</kbd></button>
+          <button id="toolRect" aria-pressed="false" title="Rectangle (M): drag to draw. Shift makes a square, Alt draws from the centre.">Rectangle <kbd>M</kbd></button>
+          <button id="toolEllipse" aria-pressed="false" title="Ellipse (L): drag to draw. Shift makes a circle, Alt draws from the centre.">Ellipse <kbd>L</kbd></button>
         </div>
+        <label id="cutBox" class="cutbox" hidden title="New shapes cut a hole where they overlap the letter, instead of adding to it"><input id="cutShape" type="checkbox"> Cut out</label>
         <div class="seg" role="group" aria-label="Zoom">
           <button id="zoomOut" class="icon" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
           <button id="zoomFit" title="Fit the letter (Ctrl+0)"><span id="zoomPct">100%</span></button>
@@ -90,6 +93,24 @@
         <div class="btns"><button id="resetGlyph">Reset this letter</button></div>
         <p class="note" id="compNote" hidden></p>
       </section>
+
+      <details class="card" open>
+        <summary>Characters</summary>
+        <div class="field"><label>Letters</label>
+          <div class="seg wide" id="caseSeg" role="group" aria-label="Letters">
+            <button data-case="both" aria-pressed="true" title="Capitals and lowercase, each drawn separately">Both</button>
+            <button data-case="upper" aria-pressed="false" title="Draw capitals only. Typing lowercase gives capitals.">Capitals</button>
+            <button data-case="lower" aria-pressed="false" title="Draw lowercase only. Typing capitals gives lowercase.">Lowercase</button>
+          </div>
+        </div>
+        <div class="field"><label>Special characters</label>
+          <div class="seg wide" id="setSeg" role="group" aria-label="Special characters">
+            <button data-set="full" aria-pressed="true" title="Keep every character the starting font has, including accents and symbols">All</button>
+            <button data-set="basic" aria-pressed="false" title="Keep only A to Z, 0 to 9 and everyday punctuation">Basic</button>
+          </div>
+        </div>
+        <span class="note" id="charNote"></span>
+      </details>
 
       <details class="card" open>
         <summary>Heights</summary>

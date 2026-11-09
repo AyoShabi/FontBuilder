@@ -53,7 +53,7 @@ function loadStore(): Store {
   return store;
 }
 
-export type Tool = "select" | "add" | "remove" | "bend";
+export type Tool = "select" | "add" | "remove" | "bend" | "rect" | "ellipse";
 
 export const state = {
   store: loadStore(),

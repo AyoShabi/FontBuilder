@@ -4,6 +4,7 @@
  * this is how edits show up in real layouts before the font is exported and installed.
  */
 import { advOf, contours, type Project } from "../editor/project";
+import { outputCmap } from "../editor/charset";
 import type { Font } from "../font/types";
 import { contourToAnchors } from "./curves";
 import { hostCall } from "./script";
@@ -32,10 +33,11 @@ export function setFrame(f: Font, p: Project, fr: PreviewFrame): HostAnchor[][] 
   const s = fr.size / f.upm;
   const track = (fr.tracking / 1000) * fr.size;
   const out: HostAnchor[][] = [];
+  const cmap = outputCmap(f, p);
   const lines = fr.text.split(/[\r\n\u0003]/);
   lines.forEach((line, li) => {
     const chars = [...line];
-    const gids = chars.map((ch) => f.cmap.get(ch.codePointAt(0)!) ?? 0);
+    const gids = chars.map((ch) => cmap.get(ch.codePointAt(0)!) ?? 0);
     const width = gids.reduce((w, g) => w + advOf(f, g, p) * s + track, 0) - (gids.length ? track : 0);
     let x = fr.x - (fr.just === "center" ? width / 2 : fr.just === "right" ? width : 0);
     const y = fr.y - li * fr.leading;

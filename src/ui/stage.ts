@@ -3,9 +3,10 @@
  * the Illustrator-style keyboard shortcuts.
  */
 import { bbox, contourD } from "../font/geometry";
-import { addPoint, bendLine, canEditPoints, deletePoints, movePts } from "../editor/edits";
+import { addPoint, addShape, bendLine, canEditPoints, deletePoints, movePts } from "../editor/edits";
 import { pushUndo } from "../editor/history";
-import { hitSegment, type SegmentHit } from "../editor/outline";
+import { ellipsePoints, hitSegment, rectPoints, type SegmentHit } from "../editor/outline";
+import type { Point } from "../font/types";
 import { advOf, baseOutline, cleanEdit, contours, editedOutline, editedPts, newHeights } from "../editor/project";
 import { currentGid, glyphEdit, proj, state, type Tool } from "../editor/state";
 import type { App } from "./app";
@@ -39,7 +40,22 @@ interface Pan {
   y: number;
 }
 
+/** A rectangle or ellipse being dragged out, in font units. */
+interface ShapeDrag {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  square: boolean;
+  centre: boolean;
+}
+
 let drag: Drag | null = null;
+let shapeDrag: ShapeDrag | null = null;
+/** Corners placed so far by the Pen in empty space; closing them makes a new shape. */
+let penPath: { x: number; y: number }[] = [];
+/** Where the Pen's next corner would go, for the rubber-band line. */
+let penAt: { x: number; y: number } | null = null;
 let marq: Marquee | null = null;
 let panning: Pan | null = null;
 /** Space is held: dragging pans the view, as in Illustrator. */
@@ -138,6 +154,13 @@ export function renderEditor(): void {
     h += "</g>";
     if (hover) h += `<circle class="addpv" cx="${hover.at.x}" cy="${-hover.at.y}" r="${r * 1.3}"/>`;
   }
+  const draft = shapeDraft();
+  if (draft) h += `<path class="draft" d="${contourD(draft)}"/>`;
+  if (penPath.length) {
+    const ptsD = [...penPath, ...(penAt ? [penAt] : [])].map((q, k) => `${k ? "L" : "M"}${q.x} ${-q.y}`).join("");
+    h += `<path class="draft open" d="${ptsD}"/>`;
+    penPath.forEach((q, k) => (h += `<rect class="penpt${k === 0 ? " first" : ""}" x="${q.x - r * 0.8}" y="${-q.y - r * 0.8}" width="${r * 1.6}" height="${r * 1.6}"/>`));
+  }
   if (marq) {
     h += `<rect class="marq" x="${Math.min(marq.x0, marq.x1)}" y="${-Math.max(marq.y0, marq.y1)}" width="${Math.abs(marq.x1 - marq.x0)}" height="${Math.abs(marq.y1 - marq.y0)}"/>`;
   }
@@ -145,6 +168,42 @@ export function renderEditor(): void {
   el.classList.toggle("solid", $input("#solid").checked);
   el.dataset.tool = spaceDown || panning ? "hand" : state.tool;
   $("#zoomPct").textContent = Math.round(view.zoom * 100) + "%";
+}
+
+/** The rectangle or ellipse being dragged out, as points. */
+function shapeDraft(): Point[] | null {
+  const s = shapeDrag;
+  if (!s) return null;
+  let dx = s.x1 - s.x0;
+  let dy = s.y1 - s.y0;
+  if (s.square) {
+    const m = Math.max(Math.abs(dx), Math.abs(dy));
+    dx = Math.sign(dx || 1) * m;
+    dy = Math.sign(dy || 1) * m;
+  }
+  const [ax, ay, bx, by] = s.centre ? [s.x0 - dx, s.y0 - dy, s.x0 + dx, s.y0 + dy] : [s.x0, s.y0, s.x0 + dx, s.y0 + dy];
+  if (Math.abs(bx - ax) < 2 || Math.abs(by - ay) < 2) return null;
+  const R = (v: number) => Math.round(v);
+  if (state.tool === "rect") return rectPoints(R(Math.min(ax, bx)), R(Math.min(ay, by)), R(Math.max(ax, bx)), R(Math.max(ay, by)));
+  return ellipsePoints((ax + bx) / 2, (ay + by) / 2, Math.abs(bx - ax) / 2, Math.abs(by - ay) / 2);
+}
+
+const cutting = () => $input("#cutShape").checked;
+
+/** Closes the Pen's corners into a new shape. */
+function closePen(app: App): void {
+  const pts = penPath.map((q) => ({ x: Math.round(q.x), y: Math.round(q.y), on: true }));
+  penPath = [];
+  penAt = null;
+  if (pts.length >= 3 && addShape(pts, cutting())) {
+    app.changed();
+    scheduleLive();
+  } else renderEditor();
+}
+
+function cancelPen(): void {
+  penPath = [];
+  penAt = null;
 }
 
 /** Zooms by `factor`, keeping the point under the pointer (or the middle of the view) still. */
@@ -179,12 +238,22 @@ function panBy(dxPx: number, dyPx: number): void {
   renderEditor();
 }
 
-const TOOL_BUTTONS: Record<Tool, string> = { select: "#toolSelect", add: "#toolAdd", remove: "#toolRemove", bend: "#toolBend" };
+const TOOL_BUTTONS: Record<Tool, string> = {
+  select: "#toolSelect",
+  add: "#toolAdd",
+  remove: "#toolRemove",
+  bend: "#toolBend",
+  rect: "#toolRect",
+  ellipse: "#toolEllipse",
+};
+const DRAWS: Tool[] = ["add", "rect", "ellipse"];
 
 /** Switches between the Select, Add point, Delete point and Curve tools. */
 export function setTool(tool: Tool): void {
   state.tool = tool;
   hover = null;
+  cancelPen();
+  $("#cutBox").hidden = !DRAWS.includes(tool);
   for (const [t, sel] of Object.entries(TOOL_BUTTONS)) $(sel).setAttribute("aria-pressed", String(t === tool));
   renderEditor();
 }
@@ -237,10 +306,15 @@ function toFont(ev: PointerEvent | MouseEvent): { x: number; y: number } {
 }
 
 /** True when a key press belongs to a text box or list, not the editor. */
-function typing(target: EventTarget | null): boolean {
-  const t = target as HTMLElement | null;
+function typing(target: EventTarget | null, key: string): boolean {
+  const t = target as HTMLInputElement | null;
   const tag = (t?.tagName || "").toLowerCase();
-  return tag === "input" || tag === "select" || tag === "textarea";
+  if (tag === "select" || tag === "textarea") return true;
+  if (tag !== "input") return false;
+  // Checkboxes and buttons don't take letters, so the editor keeps its shortcuts there; sliders keep their arrows.
+  if (t!.type === "checkbox" || t!.type === "radio") return key === " ";
+  if (t!.type === "range") return key.startsWith("Arrow") || key === "Home" || key === "End" || key.startsWith("Page");
+  return true;
 }
 
 export function bindStage(app: App): void {
@@ -261,6 +335,19 @@ export function bindStage(app: App): void {
     const t = (ev.target as Element).closest<SVGElement>(".p");
     const at = toFont(ev);
     const sel = state.selPts;
+    if (state.tool === "rect" || state.tool === "ellipse") {
+      if (!canEditPoints()) return;
+      shapeDrag = { x0: at.x, y0: at.y, x1: at.x, y1: at.y, square: ev.shiftKey, centre: ev.altKey };
+      return;
+    }
+    if (state.tool === "add" && penPath.length) {
+      // Pen: close on the first corner, otherwise place another (Shift keeps it straight from the last).
+      const first = penPath[0];
+      if (penPath.length >= 3 && Math.hypot(first.x - at.x, first.y - at.y) <= HIT_PX * upp) return closePen(app);
+      penPath.push(penAt || at);
+      renderEditor();
+      return;
+    }
     if (t && state.tool === "remove") {
       if (deletePoints([+t.dataset.i!])) app.changed();
       return;
@@ -287,13 +374,18 @@ export function bindStage(app: App): void {
         scheduleLive();
       }
     } else if (state.tool === "add" || ev.altKey) {
-      // Add a point on the outline and keep dragging it, as one undo step.
+      // On the outline: add a point and keep dragging it, as one undo step. With the Pen in
+      // empty space: start a new shape.
       const hit = segmentAt(at);
       hover = null;
       if (hit && addPoint(hit.i, hit.t) != null) {
         startDrag(at, false);
         app.renderAll();
         scheduleLive();
+      } else if (!hit && state.tool === "add" && canEditPoints()) {
+        penPath = [{ x: Math.round(at.x), y: Math.round(at.y) }];
+        penAt = null;
+        renderEditor();
       }
     } else {
       if (!ev.shiftKey) sel.clear();
@@ -310,6 +402,26 @@ export function bindStage(app: App): void {
       const dy = ev.clientY - panning.y;
       panning = { x: ev.clientX, y: ev.clientY };
       panBy(dx, dy);
+      return;
+    }
+    if (shapeDrag) {
+      const at = toFont(ev);
+      shapeDrag.x1 = at.x;
+      shapeDrag.y1 = at.y;
+      shapeDrag.square = ev.shiftKey;
+      shapeDrag.centre = ev.altKey;
+      renderEditor();
+      return;
+    }
+    if (penPath.length) {
+      let at = toFont(ev);
+      if (ev.shiftKey) {
+        const last = penPath[penPath.length - 1];
+        const [dx, dy] = constrain(at.x - last.x, at.y - last.y);
+        at = { x: last.x + dx, y: last.y + dy };
+      }
+      penAt = { x: Math.round(at.x), y: Math.round(at.y) };
+      renderEditor();
       return;
     }
     if (!drag && !marq) {
@@ -361,6 +473,15 @@ export function bindStage(app: App): void {
   });
 
   const endPtr = () => {
+    if (shapeDrag) {
+      const pts = shapeDraft();
+      shapeDrag = null;
+      if (pts && addShape(pts, cutting())) {
+        app.changed();
+        scheduleLive();
+      } else renderEditor();
+      return;
+    }
     if (panning) {
       panning = null;
       renderEditor();
@@ -431,11 +552,7 @@ export function bindStage(app: App): void {
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (typing(ev.target)) {
-      // Range sliders keep their arrows, but undo still works from them.
-      const range = (ev.target as HTMLInputElement).type === "range";
-      if (!(range && (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z")) return;
-    }
+    if (typing(ev.target, ev.key)) return;
     const mod = ev.ctrlKey || ev.metaKey;
     const key = ev.key.toLowerCase();
 
@@ -489,7 +606,7 @@ export function bindStage(app: App): void {
       return;
     }
     if (!mod && !ev.altKey) {
-      // Illustrator's letters: V/A select, P pen (adds points), + add anchor, - delete anchor, Shift+C anchor point (curves).
+      // Illustrator's letters: V/A select, P pen (adds points, draws shapes), + add anchor, - delete anchor, Shift+C anchor point (curves), M rectangle, L ellipse.
       const tool: Tool | null =
         key === "v" || key === "a"
           ? "select"
@@ -499,7 +616,11 @@ export function bindStage(app: App): void {
               ? "remove"
               : key === "c"
                 ? "bend"
-                : null;
+                : key === "m"
+                  ? "rect"
+                  : key === "l"
+                    ? "ellipse"
+                    : null;
       if (tool) {
         ev.preventDefault();
         setTool(tool);
@@ -509,6 +630,15 @@ export function bindStage(app: App): void {
     if ((ev.key === "Delete" || ev.key === "Backspace") && state.selPts.size) {
       ev.preventDefault();
       if (deletePoints()) app.changed();
+      return;
+    }
+    if (penPath.length && (ev.key === "Enter" || ev.key === "Escape")) {
+      ev.preventDefault();
+      if (ev.key === "Enter") closePen(app);
+      else {
+        cancelPen();
+        renderEditor();
+      }
       return;
     }
     if (ev.key === "Escape") {

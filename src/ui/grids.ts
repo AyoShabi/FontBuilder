@@ -1,3 +1,4 @@
+import { isDrawn } from "../editor/charset";
 import { isEdited } from "../editor/project";
 import { selectZone } from "../editor/edits";
 import { currentGid, font, linkedGroup, persist, proj, setCurrentGid } from "../editor/state";
@@ -21,7 +22,8 @@ function order(c: number): number {
 
 export function renderGrids(): void {
   const f = font();
-  const all = [...f.cmap.keys()].filter((c) => c >= 32 && !(c >= 0x7f && c < 0xa0)).sort((a, b) => order(a) - order(b) || a - b);
+  const p = proj();
+  const all = [...f.cmap.keys()].filter((c) => c >= 32 && !(c >= 0x7f && c < 0xa0) && isDrawn(f, p, c)).sort((a, b) => order(a) - order(b) || a - b);
   $("#allGrid").innerHTML = all.map(cellHTML).join("");
   markGrids();
 }
