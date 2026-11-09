@@ -182,3 +182,101 @@ function fbPreviewStop() {
     return "error:" + e.message;
   }
 }
+
+/*
+ * Real-font preview: the panel saves the edited font under a new name, installs it, and these
+ * functions set the chosen text in it, so the text stays live, editable text. Chosen text
+ * frames carry a tag named FB_FONT_TAG (tags don't show in the Layers panel).
+ */
+var FB_FONT_TAG = "FontBuilderFont";
+
+function fbHasFontTag(tf) {
+  try {
+    for (var i = 0; i < tf.tags.length; i++) if (tf.tags[i].name === FB_FONT_TAG) return true;
+  } catch (e) {}
+  return false;
+}
+
+/** Every text frame in the document set in the real-font preview. */
+function fbFontFrames(doc) {
+  var out = [];
+  for (var i = 0; i < doc.textFrames.length; i++) if (fbHasFontTag(doc.textFrames[i])) out.push(doc.textFrames[i]);
+  return out;
+}
+
+/** Text frames in the selection: selected frames, or the frames of text selected with the Type tool. */
+function fbSelectedFrames(doc) {
+  var sel = doc.selection;
+  var out = [];
+  if (!sel) return out;
+  if (sel.typename === "TextRange") {
+    try {
+      var fr = sel.story.textFrames;
+      for (var k = 0; k < fr.length; k++) out.push(fr[k]);
+    } catch (e0) {}
+    return out;
+  }
+  for (var i = 0; i < sel.length; i++) if (sel[i].typename === "TextFrame") out.push(sel[i]);
+  return out;
+}
+
+/** Tags the selected text frames for the real-font preview. Returns how many frames are tagged in all. */
+function fbFontTagSelection() {
+  try {
+    if (!app.documents.length) return "error:Open a document and select some text first.";
+    var doc = app.activeDocument;
+    var sel = fbSelectedFrames(doc);
+    for (var i = 0; i < sel.length; i++) {
+      if (fbHasFontTag(sel[i])) continue;
+      var t = sel[i].tags.add();
+      t.name = FB_FONT_TAG;
+      t.value = "1";
+    }
+    return "ok:" + fbFontFrames(doc).length;
+  } catch (e) {
+    return "error:" + e.message;
+  }
+}
+
+/** The installed font with this PostScript name, or null while Illustrator hasn't picked it up yet. */
+function fbFindFont(psName) {
+  try {
+    return app.textFonts.getByName(psName);
+  } catch (e) {}
+  for (var i = 0; i < app.textFonts.length; i++) if (app.textFonts[i].name === psName) return app.textFonts[i];
+  return null;
+}
+
+/** Sets every tagged text frame in the font `psName`. "ok:-1" means Illustrator can't see the font yet. */
+function fbFontApply(psName) {
+  try {
+    if (!app.documents.length) return "ok:0";
+    var f = fbFindFont(psName);
+    if (!f) return "ok:-1";
+    var frames = fbFontFrames(app.activeDocument);
+    for (var i = 0; i < frames.length; i++) {
+      var tf = frames[i];
+      var wasLocked = tf.layer.locked;
+      tf.layer.locked = false;
+      tf.textRange.characterAttributes.textFont = f;
+      tf.layer.locked = wasLocked;
+    }
+    return "ok:" + frames.length;
+  } catch (e) {
+    return "error:" + e.message;
+  }
+}
+
+/** Stops following text frames (their text keeps whichever font it has now). */
+function fbFontUntag() {
+  try {
+    if (!app.documents.length) return "ok:0";
+    var frames = fbFontFrames(app.activeDocument);
+    for (var i = 0; i < frames.length; i++) {
+      for (var k = frames[i].tags.length - 1; k >= 0; k--) if (frames[i].tags[k].name === FB_FONT_TAG) frames[i].tags[k].remove();
+    }
+    return "ok:" + frames.length;
+  } catch (e) {
+    return "error:" + e.message;
+  }
+}

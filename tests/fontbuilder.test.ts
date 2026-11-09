@@ -282,3 +282,47 @@ describe("Characters and shapes", () => {
     expect(editedOutline(state.font, gid, proj()).ends.length).toBe(before.ends.length + 1);
   });
 });
+
+describe("Real-font preview", () => {
+  it("host.jsx tags the selected text and sets it in the installed font", () => {
+    const HOST = readFileSync("extension/jsx/host.jsx", "utf8");
+    const mkTags = () => {
+      const tags: { name: string; value: string; remove(): void }[] = [];
+      return Object.assign(tags, {
+        add() {
+          const t = { name: "", value: "", remove() { tags.splice(tags.indexOf(t), 1); } };
+          tags.push(t);
+          return t;
+        },
+      });
+    };
+    const layer = { locked: true };
+    const mk = () => ({ typename: "TextFrame", tags: mkTags(), layer, textRange: { characterAttributes: { textFont: null as unknown } } });
+    const a = mk();
+    const b = mk();
+    const fonts = [{ name: "Arial" }];
+    const doc = { selection: [a], textFrames: [a, b] };
+    const textFonts = Object.assign(fonts, {
+      getByName(n: string) {
+        const f = fonts.find((x) => x.name === n);
+        if (!f) throw new Error("no font");
+        return f;
+      },
+    });
+    const ctx = createContext({ app: { documents: [doc], activeDocument: doc, textFonts } });
+    runInContext(HOST, ctx);
+    const run = (s: string) => runInContext(s, ctx) as string;
+
+    expect(run("fbFontTagSelection()")).toBe("ok:1");
+    expect(run("fbFontTagSelection()")).toBe("ok:1"); // tagging twice doesn't add a second tag
+    expect(a.tags).toHaveLength(1);
+    expect(run('fbFontApply("BrandDisplayPreview1-Regular")')).toBe("ok:-1"); // not loaded yet
+    fonts.push({ name: "BrandDisplayPreview1-Regular" });
+    expect(run('fbFontApply("BrandDisplayPreview1-Regular")')).toBe("ok:1");
+    expect(a.textRange.characterAttributes.textFont).toEqual({ name: "BrandDisplayPreview1-Regular" });
+    expect(b.textRange.characterAttributes.textFont).toBe(null);
+    expect(layer.locked).toBe(true); // locked layers are unlocked only while setting the font
+    expect(run("fbFontUntag()")).toBe("ok:1");
+    expect(a.tags).toHaveLength(0);
+  });
+});

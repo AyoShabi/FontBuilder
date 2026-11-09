@@ -17,7 +17,8 @@ brand's own font.
   | Key | Does |
   | --- | --- |
   | V or A | Select and move points |
-  | P (Pen) or + (or hold Alt) | Click the outline to add a point; click in empty space to draw a new shape (click the first corner or press Enter to close it, Esc cancels) |
+  | + (or hold Alt) | Add point: click the outline to add a point |
+  | P | Pen: click in empty space to place corners of a new shape (click the first corner or press Enter to close it, Esc cancels); clicking the outline adds a point |
   | M, L | Rectangle, Ellipse: drag to draw (Shift: square or circle, Alt: from the centre) |
   | Cut out (tick box) | New shapes cut a hole where they overlap the letter |
   | − | Delete the point you click |
@@ -43,10 +44,14 @@ brand's own font.
   as the lowercase, letters with tails, or a group you make.
 - **Guided stages**: n o H O first, then the lowercase, the capitals, and figures and
   punctuation. Each stage lets you tick letters off as reviewed.
-- **Preview on your artboard**: select text in your Illustrator document and click **Preview
-  selected text**. FontBuilder hides that text and draws it in your edited font in the same
-  place, size and colour. It redraws after every edit. **Stop preview** removes the drawing and
-  shows your text again, unchanged.
+- **Preview on your artboard**, two ways:
+  - **As a real font**: select text and click **Use on selected text**. FontBuilder saves your
+    edits as a font with a new name ("Your Name Preview 3"), installs it for your user account
+    and sets the text in it, so it stays live, editable text. Click **Update** after more edits;
+    each update installs a new preview font and removes the older ones. If Illustrator doesn't
+    pick up the first one, restart Illustrator once.
+  - **As shapes (instant)**: **Preview selected text** hides the text and draws it in your
+    edited font, redrawn after every edit. **Stop** shows your text again, unchanged.
 - **Export**: saves a `.ttf` with your font's name and style, and a licence file next to it. The
   name is checked against the licence's Reserved Font Names. The original copyright and licence
   stay in the font. Kerning and other features carry over.

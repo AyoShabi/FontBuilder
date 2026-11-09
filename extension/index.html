@@ -53,8 +53,9 @@
       <div class="edhead">
         <div class="seg" role="group" aria-label="Tool">
           <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select <kbd>V</kbd></button>
-          <button id="toolAdd" aria-pressed="false" title="Pen (P): click the outline to add a point, or click in empty space to draw a new shape. Click the first corner or press Enter to close it.">Pen <kbd>P</kbd></button>
+          <button id="toolAdd" aria-pressed="false" title="Add point (+): click the outline to add a point there">Add point <kbd>+</kbd></button>
           <button id="toolRemove" aria-pressed="false" title="Click a point to delete it (-)">Delete point <kbd>−</kbd></button>
+          <button id="toolPen" aria-pressed="false" title="Pen (P): click in empty space to place corners of a new shape. Click the first corner or press Enter to close it. Clicking the outline adds a point.">Pen <kbd>P</kbd></button>
           <button id="toolBend" aria-pressed="false" title="Drag a straight line to curve it (Shift+C)">Curve <kbd>⇧C</kbd></button>
           <button id="toolRect" aria-pressed="false" title="Rectangle (M): drag to draw. Shift makes a square, Alt draws from the centre.">Rectangle <kbd>M</kbd></button>
           <button id="toolEllipse" aria-pressed="false" title="Ellipse (L): drag to draw. Shift makes a circle, Alt draws from the centre.">Ellipse <kbd>L</kbd></button>
@@ -125,6 +126,12 @@
 
       <details class="card" open>
         <summary>Preview on artboard</summary>
+        <div class="label">As a real font</div>
+        <p class="note">Saves your edits as a font, installs it and sets your text in it. The text stays editable.</p>
+        <div class="btns"><button id="rfApply">Use on selected text</button><button id="rfUpdate">Update</button><button id="rfStop">Stop</button></div>
+        <p class="note" id="rfStatus"></p>
+        <div class="label">As shapes (instant)</div>
+        <p class="note">Draws your edits over the text after every change, without installing anything.</p>
         <div class="btns"><button id="abAdd">Preview selected text</button><button id="abStop">Stop</button></div>
         <p class="note" id="abStatus"></p>
       </details>

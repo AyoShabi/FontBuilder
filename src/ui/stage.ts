@@ -10,7 +10,7 @@ import type { Point } from "../font/types";
 import { advOf, baseOutline, cleanEdit, contours, editedOutline, editedPts, newHeights } from "../editor/project";
 import { currentGid, glyphEdit, proj, state, type Tool } from "../editor/state";
 import type { App } from "./app";
-import { $, $input } from "./dom";
+import { $, $input, toast } from "./dom";
 import { scheduleLive } from "./live";
 
 const svg = () => $<SVGSVGElement>("#stage");
@@ -65,7 +65,7 @@ let hover: SegmentHit | null = null;
 /** Font units per screen pixel at the last render. */
 let upp = 1;
 /** How close to the outline, in screen pixels, a click has to be to add a point. */
-const HIT_PX = 10;
+const HIT_PX = 14;
 
 /**
  * The view: `zoom` is relative to fitting the whole letter; `cx`/`cy` is the centre in SVG units (y down).
@@ -241,12 +241,13 @@ function panBy(dxPx: number, dyPx: number): void {
 const TOOL_BUTTONS: Record<Tool, string> = {
   select: "#toolSelect",
   add: "#toolAdd",
+  pen: "#toolPen",
   remove: "#toolRemove",
   bend: "#toolBend",
   rect: "#toolRect",
   ellipse: "#toolEllipse",
 };
-const DRAWS: Tool[] = ["add", "rect", "ellipse"];
+const DRAWS: Tool[] = ["pen", "rect", "ellipse"];
 
 /** Switches between the Select, Add point, Delete point and Curve tools. */
 export function setTool(tool: Tool): void {
@@ -330,7 +331,10 @@ export function bindStage(app: App): void {
       renderEditor();
       return;
     }
-    if (ev.button !== 0 || !isSimple() || $input("#solid").checked) return;
+    if (ev.button !== 0) return;
+    if ($input("#solid").checked) return toast("Points are hidden while Filled is on. Untick Filled (Ctrl+Y) to edit.");
+    if (!isSimple()) return toast("This character is built from other letters, so edit those instead.");
+    if (!canEditPoints()) return toast("The added points on this letter don't fit this font. Reset this letter to edit its points.");
     el.setPointerCapture(ev.pointerId);
     const t = (ev.target as Element).closest<SVGElement>(".p");
     const at = toFont(ev);
@@ -340,7 +344,7 @@ export function bindStage(app: App): void {
       shapeDrag = { x0: at.x, y0: at.y, x1: at.x, y1: at.y, square: ev.shiftKey, centre: ev.altKey };
       return;
     }
-    if (state.tool === "add" && penPath.length) {
+    if (state.tool === "pen" && penPath.length) {
       // Pen: close on the first corner, otherwise place another (Shift keeps it straight from the last).
       const first = penPath[0];
       if (penPath.length >= 3 && Math.hypot(first.x - at.x, first.y - at.y) <= HIT_PX * upp) return closePen(app);
@@ -373,7 +377,7 @@ export function bindStage(app: App): void {
         app.renderAll();
         scheduleLive();
       }
-    } else if (state.tool === "add" || ev.altKey) {
+    } else if (state.tool === "add" || state.tool === "pen" || ev.altKey) {
       // On the outline: add a point and keep dragging it, as one undo step. With the Pen in
       // empty space: start a new shape.
       const hit = segmentAt(at);
@@ -382,7 +386,7 @@ export function bindStage(app: App): void {
         startDrag(at, false);
         app.renderAll();
         scheduleLive();
-      } else if (!hit && state.tool === "add" && canEditPoints()) {
+      } else if (!hit && state.tool === "pen" && canEditPoints()) {
         penPath = [{ x: Math.round(at.x), y: Math.round(at.y) }];
         penAt = null;
         renderEditor();
@@ -425,7 +429,7 @@ export function bindStage(app: App): void {
       return;
     }
     if (!drag && !marq) {
-      const want = isSimple() && !$input("#solid").checked && !spaceDown && (state.tool === "add" || state.tool === "bend" || ev.altKey);
+      const want = isSimple() && !$input("#solid").checked && !spaceDown && (state.tool === "add" || state.tool === "pen" || state.tool === "bend" || ev.altKey);
       const onPoint = !!(ev.target as Element).closest(".p");
       const next = want && !onPoint ? segmentAt(toFont(ev)) : null;
       if (next || hover) {
@@ -606,12 +610,14 @@ export function bindStage(app: App): void {
       return;
     }
     if (!mod && !ev.altKey) {
-      // Illustrator's letters: V/A select, P pen (adds points, draws shapes), + add anchor, - delete anchor, Shift+C anchor point (curves), M rectangle, L ellipse.
+      // Illustrator's letters: V/A select, P pen (adds points on the outline, draws shapes in empty space), + add anchor, - delete anchor, Shift+C anchor point (curves), M rectangle, L ellipse.
       const tool: Tool | null =
         key === "v" || key === "a"
           ? "select"
-          : key === "p" || key === "+" || key === "="
-            ? "add"
+          : key === "p"
+            ? "pen"
+            : key === "+" || key === "="
+              ? "add"
             : key === "-" || key === "_"
               ? "remove"
               : key === "c"

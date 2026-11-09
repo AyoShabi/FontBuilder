@@ -53,7 +53,7 @@ function loadStore(): Store {
   return store;
 }
 
-export type Tool = "select" | "add" | "remove" | "bend" | "rect" | "ellipse";
+export type Tool = "select" | "add" | "pen" | "remove" | "bend" | "rect" | "ellipse";
 
 export const state = {
   store: loadStore(),
@@ -65,7 +65,7 @@ export const state = {
   link: null as string | null,
   /** The zone picked in the inspector. Linked reshapes use it while the selection is that zone. */
   zone: null as ZoneKey | null,
-  /** Editor tool: "select" moves points, "add" puts new points on the outline, "remove" deletes the point clicked, "bend" curves a straight line. */
+  /** Editor tool: "select" moves points, "add" puts new points on the outline, "pen" also draws new shapes in empty space, "remove" deletes the point clicked, "bend" curves a straight line. */
   tool: "select" as Tool,
 };
 
