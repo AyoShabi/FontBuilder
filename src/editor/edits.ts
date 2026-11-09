@@ -7,7 +7,7 @@ import type { BBox, Font, Point } from "../font/types";
 import { ZONES, zonePts, type CustomGroup, type Zone } from "./groups";
 import { pushUndo } from "./history";
 import { applyOp, deleteOps, isLine, shapeOp, splitIndex, type Outline, type OutlineOp } from "./outline";
-import { advOf, baseOutline, cleanEdit, contours, editedPts, heightMapper, trackingShift } from "./project";
+import { advOf, baseOutline, cleanEdit, contours, editedPts, heightMapper, propOf, toOffset, trackingShift } from "./project";
 import { currentGid, font, glyphEdit, linkedGids, proj, state } from "./state";
 
 export type PointMap = (q: Point, box: BBox) => { x: number; y: number };
@@ -53,7 +53,8 @@ function movePtsOf(f: Font, gid: number, idx: number[], fn: PointMap): void {
     const q = pts[i];
     const n = fn(q, bx);
     const d = e.pts[i] || [0, 0];
-    e.pts[i] = [d[0] + Math.round(n.x - q.x), d[1] + Math.round(n.y - q.y)];
+    const [ox, oy] = toOffset(proj(), n.x - q.x, n.y - q.y);
+    e.pts[i] = [d[0] + Math.round(ox), d[1] + Math.round(oy)];
   }
   cleanEdit(e);
 }
@@ -136,7 +137,8 @@ export function setPoint(i: number, x: number, y: number): void {
   e.pts = e.pts || {};
   pushUndo();
   const d = e.pts[i] || [0, 0];
-  e.pts[i] = [d[0] + Math.round(x - q.x), d[1] + Math.round(y - q.y)];
+  const [ox, oy] = toOffset(proj(), x - q.x, y - q.y);
+  e.pts[i] = [d[0] + Math.round(ox), d[1] + Math.round(oy)];
   cleanEdit(e);
 }
 
@@ -223,9 +225,12 @@ export function addShape(pts: Point[], cut: boolean): boolean {
   const my = heightMapper(font(), gid, p);
   const e = glyphEdit(gid);
   e.pts = e.pts || {};
+  const { s, t } = propOf(p);
   for (let k = 0; k < op.shape.length / 3; k++) {
+    const x = op.shape[k * 3];
     const y = op.shape[k * 3 + 1];
-    const dx = -sh;
+    // Edited x is (x + dx) * s + y * t + sh; solve for dx so the point stays where it was drawn.
+    const dx = Math.round((x - y * t - sh) / s - x);
     const dy = my ? Math.round(y - my(y)) : 0;
     if (dx || dy) e.pts[first + k] = [dx, dy];
   }

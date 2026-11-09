@@ -7,7 +7,7 @@ import { addPoint, addShape, bendLine, canEditPoints, deletePoints, movePts } fr
 import { pushUndo } from "../editor/history";
 import { ellipsePoints, hitSegment, rectPoints, type SegmentHit } from "../editor/outline";
 import type { Point } from "../font/types";
-import { advOf, baseOutline, cleanEdit, contours, editedOutline, editedPts, newHeights } from "../editor/project";
+import { advOf, baseOutline, cleanEdit, contours, editedOutline, editedPts, newHeights, toOffset } from "../editor/project";
 import { currentGid, glyphEdit, proj, state, type Tool } from "../editor/state";
 import type { App } from "./app";
 import { $, $input, toast } from "./dom";
@@ -270,6 +270,8 @@ function segmentAt(at: { x: number; y: number }): SegmentHit | null {
 }
 
 function startDrag(at: { x: number; y: number }, record: boolean, gain = 1, unselect: number | null = null): void {
+  // Hold the view still while dragging: refitting to the changing letter would slide it under the pointer.
+  view.free = true;
   const e = glyphEdit();
   e.pts = e.pts || {};
   const pts = e.pts;
@@ -451,7 +453,8 @@ export function bindStage(app: App): void {
         if (drag.needUndo) pushUndo();
       }
       const e = glyphEdit();
-      for (const [k, b] of drag.base) e.pts![k] = [b[0] + dx, b[1] + dy];
+      const [ox, oy] = toOffset(proj(), dx, dy);
+      for (const [k, b] of drag.base) e.pts![k] = [b[0] + Math.round(ox), b[1] + Math.round(oy)];
       renderEditor();
       scheduleLive();
       if (state.selPts.size === 1) {

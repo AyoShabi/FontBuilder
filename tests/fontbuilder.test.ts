@@ -326,3 +326,48 @@ describe("Real-font preview", () => {
     expect(a.tags).toHaveLength(0);
   });
 });
+
+describe("Whole-font proportions", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+
+  it("width, height and slant change every letter and move the guides, and point edits still land where dragged", async () => {
+    const { advOf, toOffset } = await import("../src/editor/project");
+    const { setPoint } = await import("../src/editor/edits");
+    const f = load("anybody");
+    state.store.slug = "anybody";
+    state.font = f;
+    state.store.projects.anybody = newProject();
+    const H = f.cmap.get(72)!;
+    setCurrentGid(H);
+    const p = proj();
+    const adv0 = advOf(f, H, p);
+    const cap0 = newHeights(f, p).cap;
+    p.proportions = { width: 80, height: 110, slant: 10 };
+    expect(advOf(f, H, p)).toBe(Math.round(adv0 * 0.8));
+    expect(newHeights(f, p).cap).toBe(Math.round(cap0 * 1.1));
+    // A point moved to (x, y) in the editor ends up exactly there.
+    setPoint(0, 300, 400);
+    const q = editedOutline(f, H, p).pts[0];
+    expect(Math.abs(q.x - 300)).toBeLessThanOrEqual(1);
+    expect(q.y).toBe(400);
+    expect(toOffset(p, 80, 0)[0]).toBeCloseTo(100);
+  });
+
+  it("exports accented letters as plain outlines so accents stay over their letters", async () => {
+    const f = load("anybody");
+    const p = { ...newProject(), proportions: { width: 70 } };
+    const e = f.cmap.get(0xe9)!; // é
+    expect(f.glyphs[e].type).toBe("composite");
+    const back = parseFont(buildFont(f, "Test Narrow", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.glyphs[e].type).toBe("simple");
+    const xs = (gid: number) => (back.glyphs[gid] as { pts: { x: number }[] }).pts.map((q) => q.x);
+    const plain = xs(back.cmap.get(0x65)!);
+    const acc = xs(e);
+    expect(Math.max(...acc)).toBeLessThanOrEqual(Math.max(...plain) + 40);
+  });
+});

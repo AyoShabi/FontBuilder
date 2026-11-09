@@ -91,6 +91,13 @@
           <label for="lsb">Left</label><label for="advw">Width</label><label for="rsb">Right</label>
           <input id="lsb" type="number" step="1"><input id="advw" type="number" step="1"><input id="rsb" type="number" step="1">
         </div>
+        <div class="label" id="xfLabel">Reshape whole letter</div>
+        <div class="btns xf">
+          <button data-xf="sx-">Narrower</button><button data-xf="sx+">Wider</button>
+          <button data-xf="sy-">Shorter</button><button data-xf="sy+">Taller</button>
+          <button data-xf="sk+">Slant right</button><button data-xf="sk-">Slant left</button>
+          <button data-xf="up">Raise</button><button data-xf="dn">Lower</button>
+        </div>
         <div class="btns"><button id="resetGlyph">Reset this letter</button></div>
         <p class="note" id="compNote" hidden></p>
       </section>
@@ -114,14 +121,21 @@
       </details>
 
       <details class="card" open>
-        <summary>Heights</summary>
+        <summary>Proportions</summary>
+        <p class="note">Change every letter at once. The guide lines move with them.</p>
+        <div class="hgrid">
+          <div class="field"><div class="row"><label for="pr_width">Width</label><output id="pr_widtho">100%</output></div><input id="pr_width" type="range" min="50" max="150" step="1" value="100"></div>
+          <div class="field"><div class="row"><label for="pr_height">Height</label><output id="pr_heighto">100%</output></div><input id="pr_height" type="range" min="60" max="150" step="1" value="100"></div>
+          <div class="field"><div class="row"><label for="pr_slant">Slant</label><output id="pr_slanto">0°</output></div><input id="pr_slant" type="range" min="-15" max="20" step="1" value="0"></div>
+        </div>
+        <div class="label">Heights</div>
         <div class="hgrid">
           <div class="field"><div class="row"><label for="h_asc">Ascender</label><output id="h_asco"></output></div><input id="h_asc" type="range" step="1" value="0"></div>
           <div class="field"><div class="row"><label for="h_cap">Cap height</label><output id="h_capo"></output></div><input id="h_cap" type="range" step="1" value="0"></div>
           <div class="field"><div class="row"><label for="h_xh">x-height</label><output id="h_xho"></output></div><input id="h_xh" type="range" step="1" value="0"></div>
           <div class="field"><div class="row"><label for="h_desc">Descender</label><output id="h_desco"></output></div><input id="h_desc" type="range" step="1" value="0"></div>
         </div>
-        <div class="btns"><button id="resetHeights">Reset heights</button></div>
+        <div class="btns"><button id="resetProps">Reset proportions</button><button id="resetHeights">Reset heights</button></div>
       </details>
 
       <details class="card" open>
@@ -145,7 +159,7 @@
       </details>
 
       <details class="card">
-        <summary>Groups and reshaping</summary>
+        <summary>Groups and zones</summary>
         <div class="label">Apply edits to a group</div>
         <select id="linkGroup" aria-label="Linked group"></select>
         <p class="note" id="linkNote" hidden></p>
@@ -159,13 +173,6 @@
           <button data-zone="desc" aria-pressed="false">Below baseline</button>
           <button data-zone="asc" aria-pressed="false">Above x-height</button>
           <button data-zone="cap" aria-pressed="false">Above cap height</button>
-        </div>
-        <div class="label" id="xfLabel">Reshape whole letter</div>
-        <div class="btns xf">
-          <button data-xf="sx-">Narrower</button><button data-xf="sx+">Wider</button>
-          <button data-xf="sy-">Shorter</button><button data-xf="sy+">Taller</button>
-          <button data-xf="sk+">Slant right</button><button data-xf="sk-">Slant left</button>
-          <button data-xf="up">Raise</button><button data-xf="dn">Lower</button>
         </div>
       </details>
     </aside>

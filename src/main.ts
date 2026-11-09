@@ -9,6 +9,7 @@ import { $ } from "./ui/dom";
 import { bindArtboard } from "./ui/artboard";
 import { bindCharset } from "./ui/charset";
 import { bindRealFont } from "./ui/realfont";
+import { bindProportions } from "./ui/proportions";
 import { registerKeys } from "./panel/keys";
 
 const app = createApp();
@@ -21,6 +22,7 @@ bindStages(app);
 bindFiles(app);
 bindCharset(app);
 bindRealFont();
+bindProportions(app);
 bindArtboard();
 // The Project menu closes when you click anywhere else.
 document.addEventListener("pointerdown", (e) => {

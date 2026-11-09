@@ -15,6 +15,7 @@ import { renderEditor } from "./stage";
 import { renderStages } from "./stages";
 import { checkName, renderToolbar, syncHeights } from "./toolbar";
 import { renderCharset } from "./charset";
+import { syncProportions } from "./proportions";
 
 export interface App {
   /** Redraws the editor, inspector, grid marks and undo buttons. */
@@ -112,6 +113,7 @@ export function createApp(): App {
       syncHeights();
       checkName();
       renderCharset();
+      syncProportions();
     },
   };
 

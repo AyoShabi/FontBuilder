@@ -37,6 +37,8 @@ brand's own font.
 - **Characters**: draw capitals only, lowercase only or both. In a capitals-only font, typing
   lowercase gives the capitals (and the other way round). **Basic** keeps A–Z, a–z, 0–9 and
   everyday punctuation and leaves accented letters and symbols out of the font.
+- **Proportions**: Width, Height and Slant sliders change every letter at once (accents
+  follow their letters), and the guide lines move with them. Point edits stay where you put them.
 - **Heights**: sliders for ascender, cap height, x-height and descender. Each one changes every
   letter at once, and the baseline stays put.
 - **Spacing and shape**: set the left and right space and the width of a letter, or reshape it
