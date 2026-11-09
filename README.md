@@ -6,7 +6,7 @@ brand's own font.
 
 ## What it does
 
-- **Starting font**: six open-licence families come with FontBuilder, in every weight and width
+- **Starting font**: seven open-licence families come with FontBuilder (including Passion One), in every weight and width
   they have. You can also pick a TrueType font installed on your computer, or choose a `.ttf`
   file. Only fonts whose licence allows changes are offered (SIL Open Font License or Apache).
   Adobe Fonts and most bought fonts can't be changed.
