@@ -7,161 +7,195 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="wrap">
-  <header class="mast">
-    <div>
-      <h1>FontBuilder</h1>
-      <p>Edit an open-licence font letter by letter, see it on your artboard, and export it as your brand's own font.</p>
+<div class="app">
+  <header class="top">
+    <div class="font">
+      <select id="fontSel" aria-label="Starting font"></select>
+      <input id="upFile" type="file" accept=".ttf,font/ttf" hidden>
+      <div id="axes" class="axes"></div>
     </div>
     <div class="actions">
-      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
-      <button id="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-      <button id="saveProj">Save project</button>
-      <button id="openProj">Open project</button>
+      <button id="undo" class="icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="redo" class="icon" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      <details class="menu">
+        <summary title="Project">Project</summary>
+        <div class="menubody">
+          <button id="saveProj">Save project…</button>
+          <button id="openProj">Open project…</button>
+          <button id="resetAll">Reset all edits…</button>
+          <div id="confirmAll" class="note warn" hidden>Discard every edit in this font? <button id="confirmYes">Discard</button> <button id="confirmNo">Keep</button></div>
+        </div>
+      </details>
       <input id="projFile" type="file" accept=".json,application/json" hidden>
-      <button id="export" class="primary">Export font (.ttf)</button>
+      <button id="checkFont" title="Find small slips in the letters you changed, like a bar just off the cap height or a line not quite straight, and fix them">Check font</button>
+      <button id="export" class="primary">Export font</button>
     </div>
   </header>
 
-  <section class="toolbar" aria-label="Font settings">
-    <div class="field">
-      <label class="label" for="fontSel">Starting font</label>
-      <select id="fontSel"></select>
-      <input id="upFile" type="file" accept=".ttf,font/ttf" hidden>
-    </div>
-    <div id="axes" style="display:contents"></div>
-    <div class="field">
-      <div class="row"><label class="label" for="track">Letter spacing</label><output id="trackOut">0</output></div>
-      <input id="track" type="range" min="-120" max="240" step="2" value="0">
-    </div>
-    <div class="field">
-      <label class="label" for="famName">Your font's name</label>
-      <input id="famName" type="text" value="Brand Display" spellcheck="false">
-      <span id="nameNote" class="note"></span>
-    </div>
-    <div class="field">
-      <label class="label" for="styleName">Style</label>
-      <input id="styleName" type="text" value="Regular" spellcheck="false" placeholder="Regular, Bold, Black…">
-    </div>
-  </section>
-
-  <section class="heights" aria-label="Heights">
-    <div class="row spread"><div class="label">Heights · move these to change every letter</div><button id="resetHeights" class="small">Reset heights</button></div>
-    <div class="hgrid">
-      <div class="field"><div class="row"><label class="label" for="h_asc">Ascender</label><output id="h_asco"></output></div><input id="h_asc" type="range" step="1" value="0"></div>
-      <div class="field"><div class="row"><label class="label" for="h_cap">Cap height</label><output id="h_capo"></output></div><input id="h_cap" type="range" step="1" value="0"></div>
-      <div class="field"><div class="row"><label class="label" for="h_xh">x-height</label><output id="h_xho"></output></div><input id="h_xh" type="range" step="1" value="0"></div>
-      <div class="field"><div class="row"><label class="label" for="h_desc">Descender</label><output id="h_desco"></output></div><input id="h_desc" type="range" step="1" value="0"></div>
-    </div>
-  </section>
+  <nav class="glyphs" aria-label="Characters">
+    <div class="grid" id="allGrid"></div>
+  </nav>
 
   <section class="stages" aria-label="Design stages">
     <ol class="stepper" id="stepper"></ol>
-    <div class="stagebody">
-      <div class="stageinfo">
-        <p id="stageGoal"></p>
-        <div id="stageFams"></div>
-        <div class="btns">
-          <button id="markReviewed" aria-pressed="false">Mark reviewed</button>
-          <button id="nextLetter">Next letter</button>
-          <span class="note" id="stageNote"></span>
-        </div>
+    <p id="stageGoal" class="goal"></p>
+    <div class="stagerow">
+      <div id="stageFams" class="fams"></div>
+      <div class="btns">
+        <button id="markReviewed" aria-pressed="false">Mark reviewed</button>
+        <button id="nextLetter">Next letter</button>
+        <span class="note" id="stageNote"></span>
       </div>
-      <div class="stageproof" id="stageProof" aria-label="Test words"></div>
     </div>
   </section>
 
-  <section class="bench">
-    <div class="panel glyphs" aria-label="Characters">
-      <div class="label">Key letters</div>
-      <div class="grid" id="sigGrid"></div>
-      <div class="label">All characters</div>
-      <div class="grid" id="allGrid"></div>
-    </div>
+  <main class="bench">
+    <aside class="tools" aria-label="Tools">
+      <div class="label">Tools</div>
+      <div class="toolset" role="group" aria-label="Tool">
+        <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select <kbd>V</kbd></button>
+        <button id="toolAdd" aria-pressed="false" title="Add point (+): click the outline to add a point there">Add point <kbd>+</kbd></button>
+        <button id="toolRemove" aria-pressed="false" title="Click a point to delete it (-)">Delete point <kbd>−</kbd></button>
+        <button id="toolPen" aria-pressed="false" title="Pen (P): click in empty space to place corners of a new shape. Click the first corner or press Enter to close it. Clicking the outline adds a point.">Pen <kbd>P</kbd></button>
+        <button id="toolBend" aria-pressed="false" title="Drag a straight line to curve it (Shift+C)">Curve <kbd>⇧C</kbd></button>
+        <button id="toolRect" aria-pressed="false" title="Rectangle (M): drag to draw. Shift makes a square, Alt draws from the centre.">Rectangle <kbd>M</kbd></button>
+        <button id="toolEllipse" aria-pressed="false" title="Ellipse (L): drag to draw. Shift makes a circle, Alt draws from the centre.">Ellipse <kbd>L</kbd></button>
+      </div>
+      <label id="cutBox" class="cutbox" hidden title="New shapes cut a hole where they overlap the letter, instead of adding to it"><input id="cutShape" type="checkbox"> Cut out</label>
+      <div class="label">Shapes</div>
+      <button id="mergeShapes" title="Merge overlapping shapes into one outline: the shapes with selected points, or every shape when nothing is selected">Merge shapes</button>
+      <div class="label">Corners</div>
+      <div class="roundrow"><input id="roundR" type="number" min="1" step="1" value="40" aria-label="Corner radius" title="Corner radius in font units"><button id="roundCorners" title="Round the selected corner points">Round</button></div>
+      <p class="note" id="toolNote"></p>
+    </aside>
 
-    <div class="panel editor">
+    <section class="editor" aria-label="Letter editor">
       <div class="edhead">
-        <div class="tools">
-          <div class="seg" role="group" aria-label="Tool">
-            <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select</button>
-            <button id="toolAdd" aria-pressed="false" title="Click the outline to add a point (P)">Add point</button>
-            <button id="toolBend" aria-pressed="false" title="Drag a straight line to bend it into a curve (C)">Curve</button>
-          </div>
-          <label><input id="showGhost" type="checkbox" checked> Original</label>
-          <label><input id="solid" type="checkbox"> Solid</label>
+        <div class="seg" role="group" aria-label="Zoom">
+          <button id="zoomOut" class="icon" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
+          <button id="zoomFit" title="Fit the letter (Ctrl+0)"><span id="zoomPct">100%</span></button>
+          <button id="zoomIn" class="icon" title="Zoom in (Ctrl++)" aria-label="Zoom in">+</button>
         </div>
-        <span class="note mono" id="pointInfo"></span>
+        <div class="toggles">
+          <label title="Show the original outline"><input id="showGhost" type="checkbox" checked> Original</label>
+          <label title="Show the letter filled in (Ctrl+Y)"><input id="solid" type="checkbox"> Filled</label>
+        </div>
       </div>
       <svg id="stage" aria-label="Letter editor" tabindex="0"></svg>
-      <div class="hint">Drag points and handles. Arrows nudge 1, Shift+arrows 10. P adds points, C bends a line, V selects, Delete removes.</div>
+      <div class="hint">Shift keeps a drag straight · Space-drag or scroll to move · Alt+scroll or Ctrl +/− to zoom · arrows nudge</div>
       <div class="loading" id="loading" hidden>Loading…</div>
-    </div>
+    </section>
 
-    <aside class="panel insp" aria-label="Letter settings">
-      <h2><span class="big" id="inspChar">C</span><span id="inspName" class="mono note"></span></h2>
-      <div class="label">Apply edits to a group</div>
-      <select id="linkGroup" aria-label="Linked group"></select>
-      <p class="note" id="linkNote" hidden></p>
-      <div id="grpForm" class="kv" hidden>
-        <label for="grpName">Name</label><input id="grpName" type="text">
-        <label for="grpChars">Letters</label><input id="grpChars" type="text" placeholder="gjpqy">
-      </div>
-      <div class="btns" id="grpBtns" hidden><button id="grpDelete">Delete group</button></div>
-      <hr>
-      <div class="label" id="spaceLabel">Spacing (font units)</div>
-      <div class="kv">
-        <label for="lsb">Left side</label><input id="lsb" type="number" step="1">
-        <label for="rsb">Right side</label><input id="rsb" type="number" step="1">
-        <label for="advw">Width</label><input id="advw" type="number" step="1">
-      </div>
-      <hr>
-      <div class="label">Zone</div>
-      <div class="btns" id="zoneBtns">
-        <button data-zone="desc" aria-pressed="false">Below baseline</button>
-        <button data-zone="asc" aria-pressed="false">Above x-height</button>
-        <button data-zone="cap" aria-pressed="false">Above cap height</button>
-      </div>
-      <div class="label" id="xfLabel">Reshape whole letter</div>
-      <div class="btns">
-        <button data-xf="sx-">Narrower</button><button data-xf="sx+">Wider</button>
-        <button data-xf="sy-">Shorter</button><button data-xf="sy+">Taller</button>
-        <button data-xf="sk+">Slant right</button><button data-xf="sk-">Slant left</button>
-        <button data-xf="up">Raise</button><button data-xf="dn">Lower</button>
-      </div>
-      <div id="delBox" hidden><div class="btns"><button id="delPts">Delete point</button></div></div>
-      <div id="ptBox" hidden>
-        <hr>
-        <div class="label">Selected point</div>
-        <div class="kv">
-          <label for="ptx">x</label><input id="ptx" type="number" step="1">
-          <label for="pty">y</label><input id="pty" type="number" step="1">
+    <aside class="side" aria-label="Settings">
+      <section class="card">
+        <h2><span class="big" id="inspChar">C</span><span id="inspName" class="mono note"></span><span class="note mono" id="pointInfo"></span></h2>
+        <div id="ptBox" hidden>
+          <div class="kv">
+            <label for="ptx">Point x</label><input id="ptx" type="number" step="1">
+            <label for="pty">Point y</label><input id="pty" type="number" step="1">
+          </div>
         </div>
-      </div>
-      <hr>
-      <div class="btns"><button id="resetGlyph">Reset this letter</button><button id="resetAll">Reset all edits</button></div>
-      <div id="confirmAll" class="note warn" hidden>Discard every edit in this font? <button id="confirmYes">Discard</button> <button id="confirmNo">Keep</button></div>
-      <p class="note" id="compNote" hidden></p>
+        <div id="delBox" hidden><div class="btns"><button id="delPts">Delete point</button></div></div>
+        <div class="label" id="spaceLabel">Spacing</div>
+        <div class="kv three">
+          <label for="lsb">Left</label><label for="advw">Width</label><label for="rsb">Right</label>
+          <input id="lsb" type="number" step="1"><input id="advw" type="number" step="1"><input id="rsb" type="number" step="1">
+        </div>
+        <div class="label" id="xfLabel">Reshape whole letter</div>
+        <div class="btns xf">
+          <button data-xf="sx-">Narrower</button><button data-xf="sx+">Wider</button>
+          <button data-xf="sy-">Shorter</button><button data-xf="sy+">Taller</button>
+          <button data-xf="sk+">Slant right</button><button data-xf="sk-">Slant left</button>
+          <button data-xf="up">Raise</button><button data-xf="dn">Lower</button>
+        </div>
+        <div class="btns"><button id="resetGlyph">Reset this letter</button></div>
+        <p class="note" id="compNote" hidden></p>
+      </section>
+
+      <details class="card" open>
+        <summary>Characters</summary>
+        <div class="field"><label>Letters</label>
+          <div class="seg wide" id="caseSeg" role="group" aria-label="Letters">
+            <button data-case="both" aria-pressed="true" title="Capitals and lowercase, each drawn separately">Both</button>
+            <button data-case="upper" aria-pressed="false" title="Draw capitals only. Typing lowercase gives capitals.">Capitals</button>
+            <button data-case="lower" aria-pressed="false" title="Draw lowercase only. Typing capitals gives lowercase.">Lowercase</button>
+          </div>
+        </div>
+        <div class="field"><label>Special characters</label>
+          <div class="seg wide" id="setSeg" role="group" aria-label="Special characters">
+            <button data-set="full" aria-pressed="true" title="Keep every character the starting font has, including accents and symbols">All</button>
+            <button data-set="basic" aria-pressed="false" title="Keep only A to Z, 0 to 9 and everyday punctuation">Basic</button>
+          </div>
+        </div>
+        <span class="note" id="charNote"></span>
+      </details>
+
+      <details class="card" open>
+        <summary>Proportions</summary>
+        <p class="note">Change every letter at once. The guide lines move with them.</p>
+        <div class="hgrid">
+          <div class="field"><div class="row"><label for="pr_width">Width</label><output id="pr_widtho">100%</output></div><input id="pr_width" type="range" min="50" max="150" step="1" value="100"></div>
+          <div class="field"><div class="row"><label for="pr_height">Height</label><output id="pr_heighto">100%</output></div><input id="pr_height" type="range" min="60" max="150" step="1" value="100"></div>
+          <div class="field"><div class="row"><label for="pr_slant">Slant</label><output id="pr_slanto">0°</output></div><input id="pr_slant" type="range" min="-15" max="20" step="1" value="0"></div>
+        </div>
+        <div class="label">Heights</div>
+        <div class="hgrid">
+          <div class="field"><div class="row"><label for="h_asc">Ascender</label><output id="h_asco"></output></div><input id="h_asc" type="range" step="1" value="0"></div>
+          <div class="field"><div class="row"><label for="h_cap">Cap height</label><output id="h_capo"></output></div><input id="h_cap" type="range" step="1" value="0"></div>
+          <div class="field"><div class="row"><label for="h_xh">x-height</label><output id="h_xho"></output></div><input id="h_xh" type="range" step="1" value="0"></div>
+          <div class="field"><div class="row"><label for="h_desc">Descender</label><output id="h_desco"></output></div><input id="h_desc" type="range" step="1" value="0"></div>
+        </div>
+        <div class="btns"><button id="resetProps">Reset proportions</button><button id="resetHeights">Reset heights</button></div>
+      </details>
+
+      <details class="card" open>
+        <summary>Preview on artboard</summary>
+        <div class="label">As a real font</div>
+        <p class="note">Saves your edits as a font, installs it and sets your text in it. The text stays editable.</p>
+        <div class="btns"><button id="rfApply">Use on selected text</button><button id="rfUpdate">Update</button><button id="rfStop">Stop</button></div>
+        <p class="note" id="rfStatus"></p>
+        <div class="label">As shapes (instant)</div>
+        <p class="note">Draws your edits over the text after every change, without installing anything.</p>
+        <div class="btns"><button id="abAdd">Preview selected text</button><button id="abStop">Stop</button></div>
+        <p class="note" id="abStatus"></p>
+      </details>
+
+      <details class="card" open>
+        <summary>Your font</summary>
+        <div class="field"><label for="famName">Name</label><input id="famName" type="text" value="Brand Display" spellcheck="false"></div>
+        <div class="field"><label for="styleName">Style</label><input id="styleName" type="text" value="Regular" spellcheck="false" placeholder="Regular, Bold, Black…"></div>
+        <span id="nameNote" class="note"></span>
+        <div class="field"><div class="row"><label for="track">Letter spacing</label><output id="trackOut">0</output></div><input id="track" type="range" min="-120" max="240" step="2" value="0"></div>
+      </details>
+
+      <details class="card">
+        <summary>Groups and zones</summary>
+        <div class="label">Apply edits to a group</div>
+        <select id="linkGroup" aria-label="Linked group"></select>
+        <p class="note" id="linkNote" hidden></p>
+        <div id="grpForm" class="kv" hidden>
+          <label for="grpName">Name</label><input id="grpName" type="text">
+          <label for="grpChars">Letters</label><input id="grpChars" type="text" placeholder="gjpqy">
+        </div>
+        <div class="btns" id="grpBtns" hidden><button id="grpDelete">Delete group</button></div>
+        <div class="label">Zone</div>
+        <div class="btns" id="zoneBtns">
+          <button data-zone="desc" aria-pressed="false">Below baseline</button>
+          <button data-zone="asc" aria-pressed="false">Above x-height</button>
+          <button data-zone="cap" aria-pressed="false">Above cap height</button>
+        </div>
+      </details>
     </aside>
-  </section>
-
-  <section class="panel artboard" aria-label="Preview on artboard">
-    <div class="row spread">
-      <div class="label">Preview on your artboard</div>
-      <div class="btns"><button id="abAdd">Preview selected text</button><button id="abStop">Stop preview</button></div>
-    </div>
-    <p class="note" id="abStatus"></p>
-  </section>
-
-  <section class="proofs" aria-label="Test text">
-    <div class="spec">
-      <div class="row">
-        <input id="specText" type="text" value="Hamburgefonstiv" aria-label="Test text" spellcheck="false">
-        <div class="field"><div class="row"><label class="label" for="specSize">Size</label><output id="specSizeOut">96px</output></div><input id="specSize" type="range" min="24" max="240" value="96"></div>
-      </div>
-      <div id="specimen" style="font-size:96px">Hamburgefonstiv</div>
-    </div>
-    <div class="spec waterfall" id="waterfall"></div>
-  </section>
+  </main>
+</div>
+<div class="dlgwrap" id="checkDlg" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="checkTitle">
+    <div class="row"><h2 id="checkTitle">Check font</h2><button id="checkClose" class="icon" aria-label="Close">×</button></div>
+    <p class="note">Looks through the letters you changed for edges just off a guide line, lines that aren't quite straight, doubled points, tiny stray shapes, and shapes that overlap or run backwards.</p>
+    <p id="checkSum"></p>
+    <div id="checkList" class="chklist"></div>
+    <div class="btns end"><button id="checkFixAll" class="primary">Fix all</button></div>
+  </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="js/panel.js"></script>

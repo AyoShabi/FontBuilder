@@ -6,34 +6,72 @@ brand's own font.
 
 ## What it does
 
-- **Starting font**: six open-licence families come with FontBuilder, in every weight and width
+- **Starting font**: seven open-licence families come with FontBuilder (including Passion One), in every weight and width
   they have. You can also pick a TrueType font installed on your computer, or choose a `.ttf`
   file. Only fonts whose licence allows changes are offered (SIL Open Font License or Apache).
   Adobe Fonts and most bought fonts can't be changed.
-- **Character grid**: every character in the font, with the key letters first. Click one to edit it.
-- **Letter editor**:
-  - Drag points and curve handles.
-  - **Add point** (P, or Alt-click) adds points.
-  - **Curve** (C): drag a straight line to bend it.
-  - Delete removes points, and deleting a curve's handle straightens it.
-  - Arrow keys nudge the selected points.
-  - Undo and redo.
+- **Character grid**: across the top of the panel, about three rows, scrolling for the rest.
+  Lowercase, then capitals, then figures, then everything else. Click one to edit it.
+- **Tools** down the left side of the editor: Select, Add point, Delete point, Pen, Curve,
+  Rectangle and Ellipse, plus:
+  - **Merge shapes**: joins overlapping shapes into one outline. It merges the shapes that have
+    selected points, or every shape in the letter when nothing is selected.
+  - **Round**: select one or more corner points, set the radius (in font units) and click
+    **Round** to turn each corner into a smooth curve.
+- **Letter editor**, with Illustrator's keys:
+
+  | Key | Does |
+  | --- | --- |
+  | V or A | Select and move points |
+  | + (or hold Alt) | Add point: click the outline to add a point |
+  | P | Pen: click in empty space to place corners of a new shape (click the first corner or press Enter to close it, Esc cancels); clicking the outline adds a point |
+  | M, L | Rectangle, Ellipse: drag to draw (Shift: square or circle, Alt: from the centre) |
+  | Cut out (tick box) | New shapes cut a hole where they overlap the letter |
+  | − | Delete the point you click |
+  | Shift+C (or C) | Curve: drag a straight line to bend it |
+  | Shift while dragging | Keep the move horizontal, vertical or at 45° |
+  | Shift-click | Add a point to the selection, or take it out |
+  | Space-drag, middle-drag, scroll | Move the view |
+  | Alt+scroll, Ctrl+scroll, Ctrl + / Ctrl − | Zoom in and out |
+  | Ctrl+0 | Fit the letter |
+  | Ctrl+Y | Filled preview on or off |
+  | Arrows (Shift: ×10) | Nudge the selected points |
+  | Delete | Delete the selected points (a curve handle straightens that part) |
+  | Ctrl+A, Ctrl+Shift+A, Esc | Select all, deselect |
+  | Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
+
+- **Characters**: draw capitals only, lowercase only or both. In a capitals-only font, typing
+  lowercase gives the capitals (and the other way round). **Basic** keeps A–Z, a–z, 0–9 and
+  everyday punctuation and leaves accented letters and symbols out of the font.
+- **Proportions**: Width, Height and Slant sliders change every letter at once (accents
+  follow their letters), and the guide lines move with them. Point edits stay where you put them.
 - **Heights**: sliders for ascender, cap height, x-height and descender. Each one changes every
   letter at once, and the baseline stays put.
 - **Spacing and shape**: set the left and right space and the width of a letter, or reshape it
   (narrower, wider, taller, slant). You can apply these to a whole group of letters at once, such
   as the lowercase, letters with tails, or a group you make.
 - **Guided stages**: n o H O first, then the lowercase, the capitals, and figures and
-  punctuation. Each stage has test words and lets you tick letters off as reviewed.
-- **Preview on your artboard**: select text in your Illustrator document and click **Preview
-  selected text**. FontBuilder hides that text and draws it in your edited font in the same
-  place, size and colour. It redraws after every edit. **Stop preview** removes the drawing and
-  shows your text again, unchanged.
+  punctuation. Each stage lets you tick letters off as reviewed.
+- **Preview on your artboard**, two ways:
+  - **As a real font**: select text and click **Use on selected text**. FontBuilder saves your
+    edits as a font with a new name ("Your Name Preview 3"), installs it for your user account
+    and sets the text in it, so it stays live, editable text. Click **Update** after more edits;
+    each update installs a new preview font and removes the older ones. If Illustrator doesn't
+    pick up the first one, restart Illustrator once.
+  - **As shapes (instant)**: **Preview selected text** hides the text and draws it in your
+    edited font, redrawn after every edit. **Stop** shows your text again, unchanged.
+- **Check font** (top bar): looks through the letters you changed for small slips and lists
+  them by letter: a flat edge a few units off a guide line, a line that's almost but not quite
+  level or upright, two points on top of each other, a shape too small to see, shapes you drew
+  that overlap the letter, and shapes running the wrong way round. **Show** takes you to the
+  letter with the points selected, **Fix** fixes one letter, **Fix all** fixes everything in one
+  undo step. Only points you moved or added are touched, so the starting font's own design
+  (like round letters dipping just below the baseline) is left alone.
 - **Export**: saves a `.ttf` with your font's name and style, and a licence file next to it. The
   name is checked against the licence's Reserved Font Names. The original copyright and licence
   stay in the font. Kerning and other features carry over.
-- **Projects**: your work is saved in the panel automatically. **Save project** and **Open
-  project** move it between computers.
+- **Projects**: your work is saved in the panel automatically. **Project > Save project** and
+  **Open project** move it between computers.
 
 ## Install (Windows)
 

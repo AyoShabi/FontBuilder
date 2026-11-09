@@ -16,6 +16,8 @@ export interface OutlineSource {
   advance(gid: number): number;
   /** New x-height and cap height for the OS/2 table, when they changed. */
   heights?: { xh: number; cap: number };
+  /** A new character map (code point to glyph), when it differs from the source font's. */
+  cmap?: Map<number, number>;
 }
 
 export function encodeSimple(ends: number[], pts: Point[]): { bytes: Uint8Array; box: BBox | null } {
@@ -238,6 +240,7 @@ export function buildFont(font: Font, naming: FontNaming | string, src: OutlineS
   T.loca = new Uint8Array(loca.buffer);
   T.hmtx = new Uint8Array(hmtx.buffer);
   T.name = buildName(font, naming);
+  if (src.cmap) T.cmap = buildCmap(src.cmap);
 
   const head = font.tables.head.slice();
   const hv = new DataView(head.buffer);
@@ -336,5 +339,79 @@ export function assemble(T: Record<string, Uint8Array>): Uint8Array {
   });
   const ho = offs[tags.indexOf("head")];
   v.setUint32(ho + 8, (0xb1b0afba - checksum(out, 0, out.length)) >>> 0);
+  return out;
+}
+
+/**
+ * A cmap table for `map`: format 4 for the Basic Multilingual Plane (Unicode and Windows
+ * platforms), plus format 12 when there are characters beyond it.
+ */
+export function buildCmap(map: Map<number, number>): Uint8Array {
+  const all = [...map].filter(([c, g]) => c >= 0 && c <= 0x10ffff && g > 0).sort((a, b) => a[0] - b[0]);
+  const bmp = all.filter(([c]) => c < 0xffff);
+
+  // Format 4: one segment per run of consecutive code points whose glyphs share a delta.
+  const segs: { start: number; end: number; delta: number }[] = [];
+  for (const [c, g] of bmp) {
+    const d = (g - c) & 0xffff;
+    const last = segs[segs.length - 1];
+    if (last && last.end === c - 1 && last.delta === d) last.end = c;
+    else segs.push({ start: c, end: c, delta: d });
+  }
+  segs.push({ start: 0xffff, end: 0xffff, delta: 1 });
+  const n = segs.length;
+  const f4 = new DataView(new ArrayBuffer(16 + n * 8));
+  const pow = 2 ** Math.floor(Math.log2(n));
+  f4.setUint16(0, 4);
+  f4.setUint16(2, f4.byteLength);
+  f4.setUint16(6, n * 2);
+  f4.setUint16(8, pow * 2);
+  f4.setUint16(10, Math.log2(pow));
+  f4.setUint16(12, n * 2 - pow * 2);
+  segs.forEach((s, i) => {
+    f4.setUint16(14 + i * 2, s.end);
+    f4.setUint16(16 + n * 2 + i * 2, s.start);
+    f4.setUint16(16 + n * 4 + i * 2, s.delta);
+    // idRangeOffset stays 0.
+  });
+
+  // Format 12, only when needed: runs of consecutive code points with consecutive glyphs.
+  let f12: DataView | null = null;
+  if (all.some(([c]) => c > 0xffff)) {
+    const groups: [number, number, number][] = [];
+    for (const [c, g] of all) {
+      const last = groups[groups.length - 1];
+      if (last && last[1] === c - 1 && last[2] + (c - last[0]) === g) last[1] = c;
+      else groups.push([c, c, g]);
+    }
+    f12 = new DataView(new ArrayBuffer(16 + groups.length * 12));
+    f12.setUint16(0, 12);
+    f12.setUint32(4, f12.byteLength);
+    f12.setUint32(12, groups.length);
+    groups.forEach(([s, e, g], i) => {
+      f12!.setUint32(16 + i * 12, s);
+      f12!.setUint32(20 + i * 12, e);
+      f12!.setUint32(24 + i * 12, g);
+    });
+  }
+
+  const recs: [number, number, DataView][] = [[0, 3, f4]];
+  if (f12) recs.push([0, 4, f12]);
+  recs.push([3, 1, f4]);
+  if (f12) recs.push([3, 10, f12]);
+  const head = 4 + recs.length * 8;
+  const total = head + f4.byteLength + (f12 ? f12.byteLength : 0);
+  const out = new Uint8Array(total);
+  const v = new DataView(out.buffer);
+  v.setUint16(2, recs.length);
+  const at4 = head;
+  const at12 = head + f4.byteLength;
+  out.set(new Uint8Array(f4.buffer), at4);
+  if (f12) out.set(new Uint8Array(f12.buffer), at12);
+  recs.forEach(([pl, enc, t], i) => {
+    v.setUint16(4 + i * 8, pl);
+    v.setUint16(6 + i * 8, enc);
+    v.setUint32(8 + i * 8, t === f4 ? at4 : at12);
+  });
   return out;
 }

@@ -14,6 +14,8 @@ import { scheduleLive } from "./live";
 import { renderEditor } from "./stage";
 import { renderStages } from "./stages";
 import { checkName, renderToolbar, syncHeights } from "./toolbar";
+import { renderCharset } from "./charset";
+import { syncProportions } from "./proportions";
 
 export interface App {
   /** Redraws the editor, inspector, grid marks and undo buttons. */
@@ -110,6 +112,8 @@ export function createApp(): App {
       $input("#styleName").value = p.style || "Regular";
       syncHeights();
       checkName();
+      renderCharset();
+      syncProportions();
     },
   };
 
@@ -117,6 +121,7 @@ export function createApp(): App {
   function afterRestore(before: number): void {
     if (pointCount() !== before) state.selPts.clear();
     app.syncProjectControls();
+    renderGrids();
     app.renderAll();
     scheduleLive(true);
     persist();

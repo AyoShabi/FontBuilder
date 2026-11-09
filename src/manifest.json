@@ -1,5 +1,23 @@
 [
  {
+  "slug": "passionone",
+  "name": "Passion One",
+  "axes": [
+   {
+    "tag": "wght",
+    "values": [
+     400,
+     700,
+     900
+    ]
+   }
+  ],
+  "default": {
+   "wght": 700
+  },
+  "rfn": "Passion"
+ },
+ {
   "slug": "anybody",
   "name": "Anybody",
   "axes": [

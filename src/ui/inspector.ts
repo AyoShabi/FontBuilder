@@ -97,7 +97,7 @@ export function renderInspector(): void {
         ? `Reshape ${plural(sel.size, "selected point")}${linkedGids().length > 1 ? " (this letter only)" : ""}`
         : `Reshape whole letter${across}`;
   const m = linkedGids().length;
-  $("#spaceLabel").textContent = m > 1 ? `Spacing (font units) · sets all ${m}` : "Spacing (font units)";
+  $("#spaceLabel").textContent = m > 1 ? `Spacing · sets all ${m}` : "Spacing";
   $("#resetGlyph").textContent = m > 1 ? `Reset ${m} letters` : "Reset this letter";
 
   const cn = $("#compNote");
@@ -113,6 +113,11 @@ export function renderInspector(): void {
   } else cn.hidden = true;
 
   $("#delBox").hidden = !(sel.size && simple);
+  const editable = simple && !!baseOutline(f, gid, p)?.fits;
+  const corners = editable ? [...sel].filter((i) => baseOutline(f, gid, p)!.pts[i]?.on).length : 0;
+  $<HTMLButtonElement>("#roundCorners").disabled = !corners;
+  $<HTMLButtonElement>("#mergeShapes").disabled = !editable;
+  $("#toolNote").textContent = corners ? `Round ${corners} corner${corners > 1 ? "s" : ""}` : "Select corner points to round them.";
   // Removing curve control points straightens the curve, so say so.
   const pts = simple ? editedPts(f, gid, p) : [];
   const allOff = sel.size > 0 && [...sel].every((i) => pts[i] && !pts[i].on);
@@ -135,7 +140,7 @@ export function renderInspector(): void {
 }
 
 export function bindInspector(app: App): void {
-  $(".insp").addEventListener("click", (e) => {
+  $(".side").addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-xf]");
     if (!b) return;
     const t = currentTarget();

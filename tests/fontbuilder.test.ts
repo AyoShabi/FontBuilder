@@ -1,6 +1,6 @@
 /** FontBuilder's additions to the editor: bending lines, font-wide heights, and the artboard preview. */
 import { parse } from "acorn";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { bendLine } from "../src/editor/edits";
@@ -187,5 +187,322 @@ describe("artboard preview", () => {
     expect(tf.hidden).toBe(false);
     expect(tf.note).toBe("");
     expect(groups).toHaveLength(0);
+  });
+});
+
+describe("Illustrator-style editing", () => {
+  it("Shift keeps a drag horizontal, vertical or at 45 degrees", async () => {
+    const { constrain } = await import("../src/ui/stage");
+    expect(constrain(100, 12)).toEqual([100, 0]);
+    expect(constrain(-8, 90)).toEqual([0, 90]);
+    const [x, y] = constrain(50, 46);
+    expect(Math.abs(x - y)).toBeLessThan(1e-9);
+    expect(x).toBeCloseTo(48, 0);
+  });
+
+  it("asks Illustrator for the editor's keys with every modifier", async () => {
+    const { keyInterest, PANEL_KEYS } = await import("../src/panel/keys");
+    const ks = keyInterest();
+    expect(ks.length).toBe(PANEL_KEYS.length * 16);
+    expect(ks).toContainEqual({ keyCode: 32 }); // Space for the hand
+    expect(ks).toContainEqual({ keyCode: 67, shiftKey: true }); // Shift+C
+    expect(ks).toContainEqual({ keyCode: 187, ctrlKey: true }); // Ctrl+=
+    expect(ks).toContainEqual({ keyCode: 90, ctrlKey: true, shiftKey: true }); // redo
+  });
+});
+
+describe("Characters and shapes", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+
+  it("a capitals-only font types capitals for lowercase, and survives export", async () => {
+    const { outputCmap, isDrawn } = await import("../src/editor/charset");
+    const f = load("passionone");
+    const p = { ...newProject(), letterCase: "upper" as const };
+    const m = outputCmap(f, p);
+    expect(m.get(97)).toBe(f.cmap.get(65)); // a -> A
+    expect(m.get(65)).toBe(f.cmap.get(65));
+    expect(isDrawn(f, p, 97)).toBe(false);
+    expect(isDrawn(f, p, 65)).toBe(true);
+    const back = parseFont(buildFont(f, "Test Caps", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.cmap.get(97)).toBe(f.cmap.get(65));
+    expect(back.cmap.get(0x31)).toBe(f.cmap.get(0x31));
+  });
+
+  it("a lowercase-only font types lowercase for capitals", async () => {
+    const { outputCmap } = await import("../src/editor/charset");
+    const f = load("passionone");
+    const m = outputCmap(f, { ...newProject(), letterCase: "lower" });
+    expect(m.get(72)).toBe(f.cmap.get(104)); // H -> h
+  });
+
+  it("the basic set leaves accented letters and symbols out", async () => {
+    const { outputCmap } = await import("../src/editor/charset");
+    const f = load("passionone");
+    expect(f.cmap.has(0xe9)).toBe(true); // é in the starting font
+    const p = { ...newProject(), charset: "basic" as const };
+    const back = parseFont(buildFont(f, "Test Basic", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.cmap.has(0xe9)).toBe(false);
+    expect(back.cmap.get(0x41)).toBe(f.cmap.get(0x41));
+    expect(back.cmap.has(0xa3)).toBe(f.cmap.has(0xa3)); // £ stays
+    expect(outputCmap(f, p).size).toBe(back.cmap.size);
+  });
+
+  it("draws a filled rectangle and a cut-out ellipse into a letter", async () => {
+    const { addShape } = await import("../src/editor/edits");
+    const { rectPoints, ellipsePoints, signedArea, fillDirection } = await import("../src/editor/outline");
+    state.store.slug = "passionone";
+    state.store.loc = { wght: 700 };
+    state.font = load("passionone");
+    state.store.projects.passionone = newProject();
+    const gid = state.font.cmap.get(72)!; // H
+    setCurrentGid(gid);
+    const before = editedOutline(state.font, gid, proj());
+    const dir = fillDirection(before);
+    expect(addShape(rectPoints(0, 700, 200, 800), false)).toBe(true);
+    let o = editedOutline(state.font, gid, proj());
+    expect(o.ends.length).toBe(before.ends.length + 1);
+    const rect = o.pts.slice(before.pts.length);
+    expect(Math.sign(signedArea(rect))).toBe(dir);
+    expect(rect.map((q) => [q.x, q.y])).toContainEqual([200, 800]);
+    expect(addShape(ellipsePoints(300, 300, 50, 80), true)).toBe(true);
+    o = editedOutline(state.font, gid, proj());
+    const ell = o.pts.slice(before.pts.length + 4);
+    expect(ell.length).toBe(16);
+    expect(Math.sign(signedArea(ell))).toBe(-dir);
+    // It exports and reads back.
+    const back = parseFont(buildFont(state.font, "Test Shapes", outlineSource(state.font, proj())).buffer as ArrayBuffer);
+    const G = back.glyphs[gid];
+    expect(G.type === "simple" && G.ends.length).toBe(before.ends.length + 2);
+    undo();
+    expect(editedOutline(state.font, gid, proj()).ends.length).toBe(before.ends.length + 1);
+  });
+});
+
+describe("Real-font preview", () => {
+  it("host.jsx tags the selected text and sets it in the installed font", () => {
+    const HOST = readFileSync("extension/jsx/host.jsx", "utf8");
+    const mkTags = () => {
+      const tags: { name: string; value: string; remove(): void }[] = [];
+      return Object.assign(tags, {
+        add() {
+          const t = { name: "", value: "", remove() { tags.splice(tags.indexOf(t), 1); } };
+          tags.push(t);
+          return t;
+        },
+      });
+    };
+    const layer = { locked: true };
+    const mk = () => ({ typename: "TextFrame", tags: mkTags(), layer, textRange: { characterAttributes: { textFont: null as unknown } } });
+    const a = mk();
+    const b = mk();
+    const fonts = [{ name: "Arial" }];
+    const doc = { selection: [a], textFrames: [a, b] };
+    const textFonts = Object.assign(fonts, {
+      getByName(n: string) {
+        const f = fonts.find((x) => x.name === n);
+        if (!f) throw new Error("no font");
+        return f;
+      },
+    });
+    const ctx = createContext({ app: { documents: [doc], activeDocument: doc, textFonts } });
+    runInContext(HOST, ctx);
+    const run = (s: string) => runInContext(s, ctx) as string;
+
+    expect(run("fbFontTagSelection()")).toBe("ok:1");
+    expect(run("fbFontTagSelection()")).toBe("ok:1"); // tagging twice doesn't add a second tag
+    expect(a.tags).toHaveLength(1);
+    expect(run('fbFontApply("BrandDisplayPreview1-Regular")')).toBe("ok:-1"); // not loaded yet
+    fonts.push({ name: "BrandDisplayPreview1-Regular" });
+    expect(run('fbFontApply("BrandDisplayPreview1-Regular")')).toBe("ok:1");
+    expect(a.textRange.characterAttributes.textFont).toEqual({ name: "BrandDisplayPreview1-Regular" });
+    expect(b.textRange.characterAttributes.textFont).toBe(null);
+    expect(layer.locked).toBe(true); // locked layers are unlocked only while setting the font
+    expect(run("fbFontUntag()")).toBe("ok:1");
+    expect(a.tags).toHaveLength(0);
+  });
+});
+
+describe("Whole-font proportions", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+
+  it("width, height and slant change every letter and move the guides, and point edits still land where dragged", async () => {
+    const { advOf, toOffset } = await import("../src/editor/project");
+    const { setPoint } = await import("../src/editor/edits");
+    const f = load("anybody");
+    state.store.slug = "anybody";
+    state.font = f;
+    state.store.projects.anybody = newProject();
+    const H = f.cmap.get(72)!;
+    setCurrentGid(H);
+    const p = proj();
+    const adv0 = advOf(f, H, p);
+    const cap0 = newHeights(f, p).cap;
+    p.proportions = { width: 80, height: 110, slant: 10 };
+    expect(advOf(f, H, p)).toBe(Math.round(adv0 * 0.8));
+    expect(newHeights(f, p).cap).toBe(Math.round(cap0 * 1.1));
+    // A point moved to (x, y) in the editor ends up exactly there.
+    setPoint(0, 300, 400);
+    const q = editedOutline(f, H, p).pts[0];
+    expect(Math.abs(q.x - 300)).toBeLessThanOrEqual(1);
+    expect(q.y).toBe(400);
+    expect(toOffset(p, 80, 0)[0]).toBeCloseTo(100);
+  });
+
+  it("exports accented letters as plain outlines so accents stay over their letters", async () => {
+    const f = load("anybody");
+    const p = { ...newProject(), proportions: { width: 70 } };
+    const e = f.cmap.get(0xe9)!; // é
+    expect(f.glyphs[e].type).toBe("composite");
+    const back = parseFont(buildFont(f, "Test Narrow", outlineSource(f, p)).buffer as ArrayBuffer);
+    expect(back.glyphs[e].type).toBe("simple");
+    const xs = (gid: number) => (back.glyphs[gid] as { pts: { x: number }[] }).pts.map((q) => q.x);
+    const plain = xs(back.cmap.get(0x65)!);
+    const acc = xs(e);
+    expect(Math.max(...acc)).toBeLessThanOrEqual(Math.max(...plain) + 40);
+  });
+});
+
+describe("Merge shapes and round corners", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+  const area = (pts: { x: number; y: number }[]) => {
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return a / 2;
+  };
+  const start = (gidChar: number) => {
+    state.store.slug = "passionone";
+    state.font = load("passionone");
+    state.store.projects.passionone = newProject();
+    setCurrentGid(state.font.cmap.get(gidChar)!);
+    return state.font.cmap.get(gidChar)!;
+  };
+
+  it("merges an overlapping rectangle into the letter as one outline", async () => {
+    const { addShape, mergeShapes } = await import("../src/editor/edits");
+    const { rectPoints } = await import("../src/editor/outline");
+    const gid = start(73); // I: one contour
+    const before = editedOutline(state.font!, gid, proj());
+    expect(before.ends.length).toBe(1);
+    const xs = before.pts.map((q) => q.x);
+    const top = Math.max(...before.pts.map((q) => q.y));
+    // A bar across the top, overlapping the stem.
+    expect(addShape(rectPoints(Math.min(...xs) - 60, top - 80, Math.max(...xs) + 60, top + 20), false)).toBe(true);
+    expect(editedOutline(state.font!, gid, proj()).ends.length).toBe(2);
+    state.selPts.clear();
+    expect(mergeShapes()).toBe(true);
+    const after = editedOutline(state.font!, gid, proj());
+    expect(after.ends.length).toBe(1);
+    // The merged shape covers both: wider than the stem and as tall as the bar.
+    expect(Math.min(...after.pts.map((q) => q.x))).toBe(Math.min(...xs) - 60);
+    expect(Math.max(...after.pts.map((q) => q.y))).toBe(top + 20);
+    expect(Math.sign(area(after.pts))).toBe(Math.sign(area(before.pts)));
+    // It survives export.
+    const back = parseFont(buildFont(state.font!, "Test Merge", outlineSource(state.font!, proj())).buffer as ArrayBuffer);
+    expect((back.glyphs[gid] as { ends: number[] }).ends.length).toBe(1);
+    undo();
+    expect(editedOutline(state.font!, gid, proj()).ends.length).toBe(2);
+  });
+
+  it("rounds a square corner into a curve of the given radius", async () => {
+    const { roundCorners } = await import("../src/editor/edits");
+    const gid = start(73);
+    const o = editedOutline(state.font!, gid, proj());
+    // The bottom-left corner of I.
+    let best = 0;
+    o.pts.forEach((q, i) => {
+      if (q.on && q.x + q.y < o.pts[best].x + o.pts[best].y) best = i;
+    });
+    const c = o.pts[best];
+    state.selPts = new Set([best]);
+    expect(roundCorners(30)).toBe(true);
+    const r = editedOutline(state.font!, gid, proj());
+    expect(r.pts.length).toBe(o.pts.length + 2);
+    const ctrl = r.pts.find((q) => !q.on && q.x === c.x && q.y === c.y);
+    expect(ctrl).toBeTruthy();
+    const ons = r.pts.filter((q) => q.on && Math.abs(Math.hypot(q.x - c.x, q.y - c.y) - 30) < 1.5);
+    expect(ons.length).toBe(2);
+    expect(r.pts.some((q) => q.on && q.x === c.x && q.y === c.y)).toBe(false);
+  });
+});
+
+describe("Check font", () => {
+  /** An on-curve corner of H at the cap height with a flat line to its neighbour, and a stem corner on the baseline. */
+  const corners = () => {
+    const o = editedOutline(font, gid("H"), proj());
+    const cap = Math.max(...o.pts.map((q) => q.y));
+    const top = o.pts.findIndex((q, i) => q.on && q.y === cap && o.pts.some((r, j) => j !== i && r.on && r.y === cap));
+    const foot = o.pts.findIndex((q) => q.on && q.y === 0);
+    return { o, top, foot, cap };
+  };
+
+  it("finds nothing in letters you haven't touched", async () => {
+    const { checkFont } = await import("../src/editor/check");
+    expect(checkFont(font, proj())).toEqual([]);
+  });
+
+  it("puts a bar dragged just under the cap height back on the line", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { setPoint } = await import("../src/editor/edits");
+    setCurrentGid(gid("H"));
+    const { o, top, cap } = corners();
+    setPoint(top, o.pts[top].x, cap - 5);
+    const issues = checkFont(font, proj());
+    expect(issues.some((i) => i.kind === "guide" && i.gid === gid("H") && i.pts.includes(top))).toBe(true);
+    expect(fixFont(font, proj())).toBe(1);
+    expect(editedOutline(font, gid("H"), proj()).pts[top].y).toBe(cap);
+    expect(checkFont(font, proj())).toEqual([]);
+    undo();
+    expect(editedOutline(font, gid("H"), proj()).pts[top].y).toBe(cap - 5);
+  });
+
+  it("straightens a stem nudged a few units off upright", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { setPoint } = await import("../src/editor/edits");
+    setCurrentGid(gid("H"));
+    const { o, foot } = corners();
+    const x = o.pts[foot].x;
+    setPoint(foot, x + 4, 0);
+    expect(checkFont(font, proj()).some((i) => i.kind === "line")).toBe(true);
+    fixFont(font, proj());
+    expect(editedOutline(font, gid("H"), proj()).pts[foot].x).toBe(x);
+    expect(checkFont(font, proj())).toEqual([]);
+  });
+
+  it("removes a tiny stray shape and merges a shape that overlaps the letter", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { addShape } = await import("../src/editor/edits");
+    const { rectPoints } = await import("../src/editor/outline");
+    setCurrentGid(gid("I"));
+    const o = editedOutline(font, gid("I"), proj());
+    const n = o.ends.length;
+    const xs = o.pts.map((q) => q.x);
+    addShape(rectPoints(-400, 300, -395, 304), false);
+    addShape(rectPoints(Math.min(...xs) - 50, 200, Math.max(...xs) + 50, 260), false);
+    const kinds = checkFont(font, proj()).map((i) => i.kind);
+    expect(kinds).toContain("stray");
+    fixFont(font, proj());
+    const after = editedOutline(font, gid("I"), proj());
+    expect(after.ends.length).toBe(n);
+    expect(Math.min(...after.pts.map((q) => q.x))).toBe(Math.min(...xs) - 50);
+    expect(checkFont(font, proj())).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import type { OutlineSource } from "../font/writer";
+import { isDefaultCharset, outputCmap, type Charset, type LetterCase } from "./charset";
 import type { Font, Point } from "../font/types";
 import type { CustomGroup } from "./groups";
 import { applyOps, type Outline, type OutlineOp } from "./outline";
@@ -42,6 +43,39 @@ export interface Project {
   stage?: number;
   /** Characters the user has marked as reviewed, stored as characters so they survive other cuts. */
   reviewed?: string;
+  /** Capitals only, lowercase only, or both (the default). See charset.ts. */
+  letterCase?: LetterCase;
+  /** The starting font's full character set (the default), or just the basic one. */
+  charset?: Charset;
+  /** Whole-font proportions, applied on top of every other edit. */
+  proportions?: Proportions;
+}
+
+/** Whole-font proportions: width and height in percent (100 = unchanged), slant in degrees (positive leans right). */
+export interface Proportions {
+  width?: number;
+  height?: number;
+  slant?: number;
+}
+
+/** Horizontal scale and slant (as x per unit of y) for the project. */
+export function propOf(p: Project): { s: number; t: number; hs: number } {
+  const q = p.proportions || {};
+  return { s: (q.width || 100) / 100, t: Math.tan(((q.slant || 0) * Math.PI) / 180), hs: (q.height || 100) / 100 };
+}
+
+export const hasProportions = (p: Project) => {
+  const { s, t, hs } = propOf(p);
+  return s !== 1 || t !== 0 || hs !== 1;
+};
+
+/**
+ * A move of (dx, dy) as seen in the editor, as a change to a point's stored offset. Offsets
+ * are kept before the width and slant are applied, so those stay adjustable afterwards.
+ */
+export function toOffset(p: Project, dx: number, dy: number): [number, number] {
+  const { s, t } = propOf(p);
+  return [(dx - dy * t) / s, dy];
 }
 
 export const DEFAULT_FAMILY = "Brand Display";
@@ -105,10 +139,12 @@ export function keyHeights(font: Font): KeyHeights {
 export function newHeights(font: Font, p: Project): KeyHeights {
   const k = keyHeights(font);
   const h = p.heights || {};
-  return { xh: k.xh + (h.xh || 0), cap: k.cap + (h.cap || 0), asc: k.asc + (h.asc || 0), desc: k.desc - (h.desc || 0) };
+  const { hs } = propOf(p);
+  const r = (v: number) => Math.round(v * hs);
+  return { xh: r(k.xh + (h.xh || 0)), cap: r(k.cap + (h.cap || 0)), asc: r(k.asc + (h.asc || 0)), desc: r(k.desc - (h.desc || 0)) };
 }
 
-export const hasHeights = (p: Project) => !!p.heights && Object.values(p.heights).some((v) => v);
+export const hasHeights = (p: Project) => (!!p.heights && Object.values(p.heights).some((v) => v)) || propOf(p).hs !== 1;
 
 /** Piecewise-linear map through (from[i] -> to[i]), shifting by the end deltas beyond the ends. */
 function remap(y: number, from: number[], to: number[]): number {
@@ -154,9 +190,13 @@ export function editedOutline(font: Font, gid: number, p: Project): Outline {
   const d = base.fits ? e?.pts : undefined;
   const sh = (e?.shift || 0) + trackingShift(p);
   const my = heightMapper(font, gid, p);
+  const { s, t } = propOf(p);
   return {
     ends: base.ends,
-    pts: base.pts.map((q, i) => ({ x: q.x + (d?.[i]?.[0] || 0) + sh, y: (my ? my(q.y) : q.y) + (d?.[i]?.[1] || 0), on: q.on })),
+    pts: base.pts.map((q, i) => {
+      const y = (my ? my(q.y) : q.y) + (d?.[i]?.[1] || 0);
+      return { x: Math.round((q.x + (d?.[i]?.[0] || 0)) * s + y * t) + sh, y, on: q.on };
+    }),
   };
 }
 
@@ -169,7 +209,8 @@ export function advOf(font: Font, gid: number, p: Project): number {
   const a = font.adv[gid];
   if (!a) return 0;
   const e = p.edits[gid];
-  return Math.max(0, a + ((e && e.shift) || 0) + ((e && e.adv) || 0) + (p.tracking || 0));
+  const { s } = propOf(p);
+  return Math.max(0, Math.round((a + ((e && e.adv) || 0)) * s) + ((e && e.shift) || 0) + (p.tracking || 0));
 }
 
 /**
@@ -197,11 +238,15 @@ export function contours(font: Font, gid: number, p: Project, depth = 0, orig = 
     for (const c of G.comps) {
       for (const ct of contours(font, c.gi, p, depth + 1, orig)) {
         out.push(
-          ct.map((q) => ({
-            x: q.x * c.m[0] + q.y * c.m[2] + c.dx,
-            y: q.x * c.m[1] + q.y * c.m[3] + c.dy,
-            on: q.on,
-          })),
+          ct.map((q) => {
+            // Component offsets follow the font's width and slant, so accents stay over their letters.
+            const { s, t } = orig ? { s: 1, t: 0 } : propOf(p);
+            return {
+              x: q.x * c.m[0] + q.y * c.m[2] + c.dx * s + c.dy * t,
+              y: q.x * c.m[1] + q.y * c.m[3] + c.dy,
+              on: q.on,
+            };
+          }),
         );
       }
     }
@@ -223,9 +268,22 @@ export function isEdited(e: GlyphEdit | undefined): boolean {
 /** Adapts a font and project to what the writer needs. */
 export function outlineSource(font: Font, p: Project): OutlineSource {
   return {
-    outline: (gid) => (font.glyphs[gid].type === "simple" ? editedOutline(font, gid, p) : null),
+    outline: (gid) => {
+      const G = font.glyphs[gid];
+      if (G.type === "simple") return editedOutline(font, gid, p);
+      // With new proportions a composite's offsets would be wrong, so write it out as a plain glyph.
+      if (G.type === "composite" && hasProportions(p)) {
+        const cs = contours(font, gid, p).filter((c) => c.length);
+        const ends: number[] = [];
+        let n = 0;
+        for (const c of cs) ends.push((n += c.length) - 1);
+        return { ends, pts: cs.flat() };
+      }
+      return null;
+    },
     contours: (gid) => contours(font, gid, p),
     advance: (gid) => advOf(font, gid, p),
     heights: hasHeights(p) ? newHeights(font, p) : undefined,
+    cmap: isDefaultCharset(p) ? undefined : outputCmap(font, p),
   };
 }

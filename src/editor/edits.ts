@@ -6,9 +6,10 @@ import { bbox } from "../font/geometry";
 import type { BBox, Font, Point } from "../font/types";
 import { ZONES, zonePts, type CustomGroup, type Zone } from "./groups";
 import { pushUndo } from "./history";
-import { applyOp, deleteOps, isLine, splitIndex, type Outline, type OutlineOp } from "./outline";
-import { advOf, baseOutline, cleanEdit, contours, editedPts } from "./project";
+import { applyOp, deleteOps, isLine, shapeOp, splitIndex, type Outline, type OutlineOp } from "./outline";
+import { advOf, baseOutline, cleanEdit, contours, editedPts, heightMapper, propOf, toOffset, trackingShift } from "./project";
 import { currentGid, font, glyphEdit, linkedGids, proj, state } from "./state";
+import { mergeContours } from "./merge";
 
 export type PointMap = (q: Point, box: BBox) => { x: number; y: number };
 
@@ -53,7 +54,8 @@ function movePtsOf(f: Font, gid: number, idx: number[], fn: PointMap): void {
     const q = pts[i];
     const n = fn(q, bx);
     const d = e.pts[i] || [0, 0];
-    e.pts[i] = [d[0] + Math.round(n.x - q.x), d[1] + Math.round(n.y - q.y)];
+    const [ox, oy] = toOffset(proj(), n.x - q.x, n.y - q.y);
+    e.pts[i] = [d[0] + Math.round(ox), d[1] + Math.round(oy)];
   }
   cleanEdit(e);
 }
@@ -136,7 +138,8 @@ export function setPoint(i: number, x: number, y: number): void {
   e.pts = e.pts || {};
   pushUndo();
   const d = e.pts[i] || [0, 0];
-  e.pts[i] = [d[0] + Math.round(x - q.x), d[1] + Math.round(y - q.y)];
+  const [ox, oy] = toOffset(proj(), x - q.x, y - q.y);
+  e.pts[i] = [d[0] + Math.round(ox), d[1] + Math.round(oy)];
   cleanEdit(e);
 }
 
@@ -146,7 +149,7 @@ export function canEditPoints(gid = currentGid()): boolean {
 }
 
 /** The outline with points moved but not shifted, so new offsets come out as edited minus base. */
-function moved(base: Outline, d: Record<number, [number, number]> | undefined): Outline {
+export function moved(base: Outline, d: Record<number, [number, number]> | undefined): Outline {
   return { ends: base.ends, pts: base.pts.map((q, i) => ({ x: q.x + (d?.[i]?.[0] || 0), y: q.y + (d?.[i]?.[1] || 0), on: q.on })) };
 }
 
@@ -154,8 +157,7 @@ function moved(base: Outline, d: Record<number, [number, number]> | undefined): 
  * Applies add/remove steps to the current glyph. Each step runs on both the unmoved outline and
  * the moved one, and the new offsets are the difference, so moved points stay where they are.
  */
-function applyStructural(ops: OutlineOp[]): boolean {
-  const gid = currentGid();
+export function applyStructural(ops: OutlineOp[], gid = currentGid(), undo = true): boolean {
   const p = proj();
   const start = baseOutline(font(), gid, p);
   if (!start?.fits || !ops.length) return false;
@@ -166,7 +168,7 @@ function applyStructural(ops: OutlineOp[]): boolean {
     ed = applyOp(ed!, op);
     if (!base || !ed || base.pts.length !== ed.pts.length) return false;
   }
-  pushUndo();
+  if (undo) pushUndo();
   const e = glyphEdit(gid);
   e.ops = [...(e.ops || []), ...ops];
   const pts: Record<number, [number, number]> = {};
@@ -203,6 +205,75 @@ export function bendLine(i: number): number | null {
   if (!applyStructural([{ bend: i }])) return null;
   state.selPts = new Set([i + 1]);
   return i + 1;
+}
+
+/**
+ * Adds a closed shape to the current glyph: filled, or cutting a hole where it overlaps.
+ * The new shape's points are selected, so it can be moved straight away. Returns false if the glyph can't take it.
+ */
+export function addShape(pts: Point[], cut: boolean): boolean {
+  const base = baseOutline(font(), currentGid(), proj());
+  if (!base?.fits || pts.length < 3) return false;
+  const gid = currentGid();
+  const p = proj();
+  const first = base.pts.length;
+  const op = shapeOp(base, pts, cut);
+  if (!applyStructural([op])) return false;
+  // The shape is stored where it was drawn, before the letter's shift and height changes are
+  // applied; offsets put it back exactly under the pointer.
+  const sh = (p.edits[gid]?.shift || 0) + trackingShift(p);
+  const my = heightMapper(font(), gid, p);
+  const e = glyphEdit(gid);
+  e.pts = e.pts || {};
+  const { s, t } = propOf(p);
+  for (let k = 0; k < op.shape.length / 3; k++) {
+    const x = op.shape[k * 3];
+    const y = op.shape[k * 3 + 1];
+    // Edited x is (x + dx) * s + y * t + sh; solve for dx so the point stays where it was drawn.
+    const dx = Math.round((x - y * t - sh) / s - x);
+    const dy = my ? Math.round(y - my(y)) : 0;
+    if (dx || dy) e.pts[first + k] = [dx, dy];
+  }
+  cleanEdit(e);
+  state.selPts = new Set(pts.map((_, k) => first + k));
+  return true;
+}
+
+/**
+ * Merges overlapping shapes in the current glyph into one clean outline (Illustrator's Unite):
+ * the shapes that have selected points, or every shape when nothing is selected.
+ */
+export function mergeShapes(): boolean {
+  const gid = currentGid();
+  const p = proj();
+  const base = baseOutline(font(), gid, p);
+  if (!base?.fits) return false;
+  const ed = moved(base, p.edits[gid]?.pts);
+  const which: number[] = [];
+  let s = 0;
+  base.ends.forEach((e, ci) => {
+    for (let k = s; k <= e; k++) if (state.selPts.has(k)) {
+      which.push(ci);
+      break;
+    }
+    s = e + 1;
+  });
+  const r = mergeContours(ed, which);
+  if (!r || !r.pts.length) return false;
+  if (!applyStructural([{ outline: r.pts.flatMap((q) => [q.x, q.y, q.on ? 1 : 0]), ends: r.ends }])) return false;
+  state.selPts = new Set();
+  return true;
+}
+
+/** Rounds the selected corners (on-curve points) of the current glyph with radius `r`. */
+export function roundCorners(r: number): boolean {
+  const base = baseOutline(font(), currentGid(), proj());
+  if (!base?.fits || !(r > 0)) return false;
+  const idx = [...state.selPts].filter((i) => base.pts[i]?.on).sort((a, b) => b - a);
+  if (!idx.length) return false;
+  if (!applyStructural(idx.map((i) => ({ round: i, r: Math.round(r) })))) return false;
+  state.selPts = new Set();
+  return true;
 }
 
 /** Removes the selected points of the current glyph. */

@@ -1,6 +1,7 @@
+import { isDrawn } from "../editor/charset";
 import { isEdited } from "../editor/project";
 import { selectZone } from "../editor/edits";
-import { SIGNATURE, currentGid, font, linkedGroup, persist, proj, setCurrentGid } from "../editor/state";
+import { currentGid, font, linkedGroup, persist, proj, setCurrentGid } from "../editor/state";
 import type { App } from "./app";
 import { $, escapeHtml, hex4 } from "./dom";
 
@@ -11,11 +12,18 @@ function cellHTML(c: number): string {
   return `<button class="cell${lbl ? " small" : ""}" data-g="${g}" title="${hex4(c)}">${lbl || escapeHtml(ch)}</button>`;
 }
 
+/** Letters in the order of the design stages (a–z, A–Z, 0–9), then everything else. */
+function order(c: number): number {
+  if (c >= 97 && c <= 122) return 0;
+  if (c >= 65 && c <= 90) return 1;
+  if (c >= 48 && c <= 57) return 2;
+  return c < 128 ? 3 : 4;
+}
+
 export function renderGrids(): void {
   const f = font();
-  const sig = [...new Set(SIGNATURE)].map((c) => c.codePointAt(0)!).filter((c) => f.cmap.has(c));
-  $("#sigGrid").innerHTML = sig.map(cellHTML).join("");
-  const all = [...f.cmap.keys()].filter((c) => c >= 32 && !(c >= 0x7f && c < 0xa0)).sort((a, b) => a - b);
+  const p = proj();
+  const all = [...f.cmap.keys()].filter((c) => c >= 32 && !(c >= 0x7f && c < 0xa0) && isDrawn(f, p, c)).sort((a, b) => order(a) - order(b) || a - b);
   $("#allGrid").innerHTML = all.map(cellHTML).join("");
   markGrids();
 }
