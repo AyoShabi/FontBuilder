@@ -26,7 +26,11 @@ export type OutlineOp =
   /** Turn the straight line from on-curve point `bend` to the next on-curve point into a curve, with its control point halfway along. */
   | { bend: number }
   /** Add a new closed shape after the last contour, as flat [x, y, on (1 or 0), ...] in font units. */
-  | { shape: number[] };
+  | { shape: number[] }
+  /** Round the corner at on-curve point `round` with radius `r`, in font units. */
+  | { round: number; r: number }
+  /** Replace the whole outline (after merging shapes): contour `ends` and flat [x, y, on, ...] points. */
+  | { outline: number[]; ends: number[] };
 
 type XY = { x: number; y: number };
 const lerp = (a: XY, b: XY, t: number): XY => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
@@ -227,8 +231,68 @@ export function ellipsePoints(cx: number, cy: number, rx: number, ry: number): P
   return out;
 }
 
+/** Point on the quadratic a-c-b at t. */
+const quadAt = (a: XY, c: XY, b: XY, t: number): XY => lerp(lerp(a, c, t), lerp(c, b, t), t);
+
+/** The t at which the quadratic from `a` (via c to b) is `r` away from a, at most 0.5. */
+function tAtDistance(a: XY, c: XY, b: XY, r: number): number {
+  let lo = 0;
+  let hi = 0.5;
+  const d = (t: number) => Math.hypot(quadAt(a, c, b, t).x - a.x, quadAt(a, c, b, t).y - a.y);
+  if (d(hi) <= r) return hi;
+  for (let k = 0; k < 30; k++) {
+    const m = (lo + hi) / 2;
+    if (d(m) < r) lo = m;
+    else hi = m;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * Rounds the corner at on-curve point i: the corner becomes the control point of a curve that
+ * starts and ends `r` along the two sides. A straight side is shortened; a curved side is cut
+ * where it is `r` from the corner, keeping its shape beyond. Point i is replaced by three points.
+ */
+function roundCorner(o: Outline, i: number, r: number): Outline | null {
+  const c = contourOf(o, i);
+  if (!c || !o.pts[i].on || !(r > 0) || c[1] - c[0] < 2) return null;
+  const P = o.pts;
+  const n = neighbours(o, i)!;
+  const C = P[i];
+  const nb = (k: number, dir: 1 | -1) => (dir > 0 ? neighbours(o, k)!.next : neighbours(o, k)!.prev);
+  const pts = P.slice();
+  // One side of the corner: where the new curve meets it, and a replacement for its control point.
+  const side = (k: number, dir: 1 | -1): { at: XY; ctrl?: Point } => {
+    const q = P[k];
+    if (q.on) {
+      const L = Math.hypot(q.x - C.x, q.y - C.y);
+      return { at: lerp(C, q, Math.min(r, L / 2) / (L || 1)) };
+    }
+    const k2 = nb(k, dir);
+    const end = P[k2].on ? P[k2] : lerp(q, P[k2], 0.5);
+    const t = tAtDistance(C, q, end, r);
+    return { at: quadAt(C, q, end, t), ctrl: off(lerp(q, end, t)) };
+  };
+  const a = side(n.prev, -1);
+  const b = side(n.next, 1);
+  if (a.ctrl) pts[n.prev] = a.ctrl;
+  if (b.ctrl) pts[n.next] = b.ctrl;
+  return replace({ ends: o.ends, pts }, i, [on(a.at), off(C), on(b.at)]);
+}
+
+/** Replaces the whole outline. */
+function wholeOutline(flat: number[], ends: number[]): Outline | null {
+  if (flat.length % 3) return null;
+  const pts: Point[] = [];
+  for (let k = 0; k < flat.length; k += 3) pts.push({ x: flat[k], y: flat[k + 1], on: !!flat[k + 2] });
+  if (ends.length && ends[ends.length - 1] !== pts.length - 1) return null;
+  return { ends: ends.slice(), pts };
+}
+
 export function applyOp(o: Outline, op: OutlineOp): Outline | null {
   if ("shape" in op) return shape(o, op.shape);
+  if ("round" in op) return roundCorner(o, op.round, op.r);
+  if ("outline" in op) return wholeOutline(op.outline, op.ends);
   if ("split" in op) return split(o, op.split, op.t);
   if ("bend" in op) return bend(o, op.bend);
   return del(o, op.del, !!op.join);

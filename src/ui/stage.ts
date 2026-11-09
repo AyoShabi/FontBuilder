@@ -3,7 +3,7 @@
  * the Illustrator-style keyboard shortcuts.
  */
 import { bbox, contourD } from "../font/geometry";
-import { addPoint, addShape, bendLine, canEditPoints, deletePoints, movePts } from "../editor/edits";
+import { addPoint, addShape, bendLine, canEditPoints, deletePoints, mergeShapes, movePts, roundCorners } from "../editor/edits";
 import { pushUndo } from "../editor/history";
 import { ellipsePoints, hitSegment, rectPoints, type SegmentHit } from "../editor/outline";
 import type { Point } from "../font/types";
@@ -536,6 +536,16 @@ export function bindStage(app: App): void {
   );
 
   for (const [t, sel] of Object.entries(TOOL_BUTTONS)) $(sel).onclick = () => setTool(t as Tool);
+  $("#mergeShapes").onclick = () => {
+    if (mergeShapes()) {
+      app.changed();
+      toast("Shapes merged into one outline");
+    } else toast("Nothing to merge here.");
+  };
+  $("#roundCorners").onclick = () => {
+    if (roundCorners(+$input("#roundR").value)) app.changed();
+    else toast("Select one or more corner points first (the round ones), then click Round.");
+  };
   $("#zoomIn").onclick = () => zoomBy(1.5);
   $("#zoomOut").onclick = () => zoomBy(1 / 1.5);
   $("#zoomFit").onclick = zoomFit;

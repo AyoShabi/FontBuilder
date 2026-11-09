@@ -113,6 +113,11 @@ export function renderInspector(): void {
   } else cn.hidden = true;
 
   $("#delBox").hidden = !(sel.size && simple);
+  const editable = simple && !!baseOutline(f, gid, p)?.fits;
+  const corners = editable ? [...sel].filter((i) => baseOutline(f, gid, p)!.pts[i]?.on).length : 0;
+  $<HTMLButtonElement>("#roundCorners").disabled = !corners;
+  $<HTMLButtonElement>("#mergeShapes").disabled = !editable;
+  $("#toolNote").textContent = corners ? `Round ${corners} corner${corners > 1 ? "s" : ""}` : "Select corner points to round them.";
   // Removing curve control points straightens the curve, so say so.
   const pts = simple ? editedPts(f, gid, p) : [];
   const allOff = sel.size > 0 && [...sel].every((i) => pts[i] && !pts[i].on);

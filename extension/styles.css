@@ -76,9 +76,20 @@ kbd{font:10px var(--mono);color:var(--muted);margin-left:3px}
 #markReviewed[aria-pressed=true]{border-color:var(--mint);color:var(--mint)}
 
 /* Letters | editor | settings */
-.bench{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:170px minmax(0,1fr) 240px;gap:6px}
-.glyphs{overflow:auto;background:var(--bench);border:1px solid var(--line);border-radius:8px;padding:5px;min-height:0}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px}
+.bench{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:128px minmax(0,1fr) 250px;gap:6px}
+/* Letters across the top: about three rows, scroll for the rest. */
+.glyphs{flex:0 0 auto;max-height:106px;overflow:auto;background:var(--bench);border:1px solid var(--line);border-radius:8px;padding:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:3px}
+.glyphs .cell{aspect-ratio:auto;height:30px;font-size:17px}
+/* Tools down the left */
+.tools{display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;background:var(--bench);border:1px solid var(--line);border-radius:8px;padding:6px}
+.toolset{display:flex;flex-direction:column;gap:2px}
+.tools button{text-align:left;display:flex;justify-content:space-between;align-items:center}
+.tools button[aria-pressed=true]{border-color:var(--sky);background:#2a4058}
+.tools .label{margin-top:6px}
+.roundrow{display:flex;gap:4px}
+.roundrow input{width:52px;flex:0 0 auto}
+.roundrow button{flex:1 1 auto;justify-content:center}
 .cell{position:relative;aspect-ratio:1;display:grid;place-items:center;background:var(--well);border:1px solid transparent;border-radius:4px;font-family:var(--live),var(--ui);font-size:18px;line-height:1;cursor:pointer;padding:0;overflow:hidden}
 .cell.on{border-color:var(--blue);background:var(--sel)}
 .cell.edited::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--pink)}
@@ -145,13 +156,15 @@ details.card[open] summary{margin-bottom:2px}
 
 /* Narrow panel: settings go under the editor, then everything stacks. */
 @media (max-width:900px){
-  .bench{grid-template-columns:140px minmax(0,1fr);grid-template-rows:clamp(360px,62vh,640px) auto}
+  .bench{grid-template-columns:118px minmax(0,1fr);grid-template-rows:clamp(360px,62vh,640px) auto}
   .side{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:start;overflow:visible}
   .app{height:auto;min-height:100%}
   #stage{min-height:340px}
 }
 @media (max-width:560px){
-  .bench{grid-template-columns:1fr}
-  .bench{grid-template-rows:160px clamp(340px,60vh,600px) auto}
+  .bench{grid-template-columns:1fr;grid-template-rows:auto clamp(340px,60vh,600px) auto}
+  .toolset{flex-direction:row;flex-wrap:wrap}
+  .tools{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .tools .label{display:none}
   .seg kbd{display:none}
 }

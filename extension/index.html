@@ -31,6 +31,10 @@
     </div>
   </header>
 
+  <nav class="glyphs" aria-label="Characters">
+    <div class="grid" id="allGrid"></div>
+  </nav>
+
   <section class="stages" aria-label="Design stages">
     <ol class="stepper" id="stepper"></ol>
     <p id="stageGoal" class="goal"></p>
@@ -45,22 +49,27 @@
   </section>
 
   <main class="bench">
-    <nav class="glyphs" aria-label="Characters">
-      <div class="grid" id="allGrid"></div>
-    </nav>
+    <aside class="tools" aria-label="Tools">
+      <div class="label">Tools</div>
+      <div class="toolset" role="group" aria-label="Tool">
+        <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select <kbd>V</kbd></button>
+        <button id="toolAdd" aria-pressed="false" title="Add point (+): click the outline to add a point there">Add point <kbd>+</kbd></button>
+        <button id="toolRemove" aria-pressed="false" title="Click a point to delete it (-)">Delete point <kbd>−</kbd></button>
+        <button id="toolPen" aria-pressed="false" title="Pen (P): click in empty space to place corners of a new shape. Click the first corner or press Enter to close it. Clicking the outline adds a point.">Pen <kbd>P</kbd></button>
+        <button id="toolBend" aria-pressed="false" title="Drag a straight line to curve it (Shift+C)">Curve <kbd>⇧C</kbd></button>
+        <button id="toolRect" aria-pressed="false" title="Rectangle (M): drag to draw. Shift makes a square, Alt draws from the centre.">Rectangle <kbd>M</kbd></button>
+        <button id="toolEllipse" aria-pressed="false" title="Ellipse (L): drag to draw. Shift makes a circle, Alt draws from the centre.">Ellipse <kbd>L</kbd></button>
+      </div>
+      <label id="cutBox" class="cutbox" hidden title="New shapes cut a hole where they overlap the letter, instead of adding to it"><input id="cutShape" type="checkbox"> Cut out</label>
+      <div class="label">Shapes</div>
+      <button id="mergeShapes" title="Merge overlapping shapes into one outline: the shapes with selected points, or every shape when nothing is selected">Merge shapes</button>
+      <div class="label">Corners</div>
+      <div class="roundrow"><input id="roundR" type="number" min="1" step="1" value="40" aria-label="Corner radius" title="Corner radius in font units"><button id="roundCorners" title="Round the selected corner points">Round</button></div>
+      <p class="note" id="toolNote"></p>
+    </aside>
 
     <section class="editor" aria-label="Letter editor">
       <div class="edhead">
-        <div class="seg" role="group" aria-label="Tool">
-          <button id="toolSelect" aria-pressed="true" title="Select and move points (V)">Select <kbd>V</kbd></button>
-          <button id="toolAdd" aria-pressed="false" title="Add point (+): click the outline to add a point there">Add point <kbd>+</kbd></button>
-          <button id="toolRemove" aria-pressed="false" title="Click a point to delete it (-)">Delete point <kbd>−</kbd></button>
-          <button id="toolPen" aria-pressed="false" title="Pen (P): click in empty space to place corners of a new shape. Click the first corner or press Enter to close it. Clicking the outline adds a point.">Pen <kbd>P</kbd></button>
-          <button id="toolBend" aria-pressed="false" title="Drag a straight line to curve it (Shift+C)">Curve <kbd>⇧C</kbd></button>
-          <button id="toolRect" aria-pressed="false" title="Rectangle (M): drag to draw. Shift makes a square, Alt draws from the centre.">Rectangle <kbd>M</kbd></button>
-          <button id="toolEllipse" aria-pressed="false" title="Ellipse (L): drag to draw. Shift makes a circle, Alt draws from the centre.">Ellipse <kbd>L</kbd></button>
-        </div>
-        <label id="cutBox" class="cutbox" hidden title="New shapes cut a hole where they overlap the letter, instead of adding to it"><input id="cutShape" type="checkbox"> Cut out</label>
         <div class="seg" role="group" aria-label="Zoom">
           <button id="zoomOut" class="icon" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
           <button id="zoomFit" title="Fit the letter (Ctrl+0)"><span id="zoomPct">100%</span></button>

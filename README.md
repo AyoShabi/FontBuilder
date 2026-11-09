@@ -10,8 +10,14 @@ brand's own font.
   they have. You can also pick a TrueType font installed on your computer, or choose a `.ttf`
   file. Only fonts whose licence allows changes are offered (SIL Open Font License or Apache).
   Adobe Fonts and most bought fonts can't be changed.
-- **Character grid**: every character in the font: lowercase, then capitals, then figures, then
-  everything else. Click one to edit it.
+- **Character grid**: across the top of the panel, about three rows, scrolling for the rest.
+  Lowercase, then capitals, then figures, then everything else. Click one to edit it.
+- **Tools** down the left side of the editor: Select, Add point, Delete point, Pen, Curve,
+  Rectangle and Ellipse, plus:
+  - **Merge shapes**: joins overlapping shapes into one outline. It merges the shapes that have
+    selected points, or every shape in the letter when nothing is selected.
+  - **Round**: select one or more corner points, set the radius (in font units) and click
+    **Round** to turn each corner into a smooth curve.
 - **Letter editor**, with Illustrator's keys:
 
   | Key | Does |

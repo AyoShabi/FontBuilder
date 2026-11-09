@@ -371,3 +371,75 @@ describe("Whole-font proportions", () => {
     expect(Math.max(...acc)).toBeLessThanOrEqual(Math.max(...plain) + 40);
   });
 });
+
+describe("Merge shapes and round corners", () => {
+  const load = (slug: string) => {
+    const dir = `extension/fonts/${slug}`;
+    const file = readdirSync(dir).find((n) => n.endsWith(".ttf"))!;
+    const b = readFileSync(`${dir}/${file}`);
+    return parseFont(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  };
+  const area = (pts: { x: number; y: number }[]) => {
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return a / 2;
+  };
+  const start = (gidChar: number) => {
+    state.store.slug = "passionone";
+    state.font = load("passionone");
+    state.store.projects.passionone = newProject();
+    setCurrentGid(state.font.cmap.get(gidChar)!);
+    return state.font.cmap.get(gidChar)!;
+  };
+
+  it("merges an overlapping rectangle into the letter as one outline", async () => {
+    const { addShape, mergeShapes } = await import("../src/editor/edits");
+    const { rectPoints } = await import("../src/editor/outline");
+    const gid = start(73); // I: one contour
+    const before = editedOutline(state.font!, gid, proj());
+    expect(before.ends.length).toBe(1);
+    const xs = before.pts.map((q) => q.x);
+    const top = Math.max(...before.pts.map((q) => q.y));
+    // A bar across the top, overlapping the stem.
+    expect(addShape(rectPoints(Math.min(...xs) - 60, top - 80, Math.max(...xs) + 60, top + 20), false)).toBe(true);
+    expect(editedOutline(state.font!, gid, proj()).ends.length).toBe(2);
+    state.selPts.clear();
+    expect(mergeShapes()).toBe(true);
+    const after = editedOutline(state.font!, gid, proj());
+    expect(after.ends.length).toBe(1);
+    // The merged shape covers both: wider than the stem and as tall as the bar.
+    expect(Math.min(...after.pts.map((q) => q.x))).toBe(Math.min(...xs) - 60);
+    expect(Math.max(...after.pts.map((q) => q.y))).toBe(top + 20);
+    expect(Math.sign(area(after.pts))).toBe(Math.sign(area(before.pts)));
+    // It survives export.
+    const back = parseFont(buildFont(state.font!, "Test Merge", outlineSource(state.font!, proj())).buffer as ArrayBuffer);
+    expect((back.glyphs[gid] as { ends: number[] }).ends.length).toBe(1);
+    undo();
+    expect(editedOutline(state.font!, gid, proj()).ends.length).toBe(2);
+  });
+
+  it("rounds a square corner into a curve of the given radius", async () => {
+    const { roundCorners } = await import("../src/editor/edits");
+    const gid = start(73);
+    const o = editedOutline(state.font!, gid, proj());
+    // The bottom-left corner of I.
+    let best = 0;
+    o.pts.forEach((q, i) => {
+      if (q.on && q.x + q.y < o.pts[best].x + o.pts[best].y) best = i;
+    });
+    const c = o.pts[best];
+    state.selPts = new Set([best]);
+    expect(roundCorners(30)).toBe(true);
+    const r = editedOutline(state.font!, gid, proj());
+    expect(r.pts.length).toBe(o.pts.length + 2);
+    const ctrl = r.pts.find((q) => !q.on && q.x === c.x && q.y === c.y);
+    expect(ctrl).toBeTruthy();
+    const ons = r.pts.filter((q) => q.on && Math.abs(Math.hypot(q.x - c.x, q.y - c.y) - 30) < 1.5);
+    expect(ons.length).toBe(2);
+    expect(r.pts.some((q) => q.on && q.x === c.x && q.y === c.y)).toBe(false);
+  });
+});

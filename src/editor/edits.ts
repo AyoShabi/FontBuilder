@@ -9,6 +9,7 @@ import { pushUndo } from "./history";
 import { applyOp, deleteOps, isLine, shapeOp, splitIndex, type Outline, type OutlineOp } from "./outline";
 import { advOf, baseOutline, cleanEdit, contours, editedPts, heightMapper, propOf, toOffset, trackingShift } from "./project";
 import { currentGid, font, glyphEdit, linkedGids, proj, state } from "./state";
+import { mergeContours } from "./merge";
 
 export type PointMap = (q: Point, box: BBox) => { x: number; y: number };
 
@@ -236,6 +237,43 @@ export function addShape(pts: Point[], cut: boolean): boolean {
   }
   cleanEdit(e);
   state.selPts = new Set(pts.map((_, k) => first + k));
+  return true;
+}
+
+/**
+ * Merges overlapping shapes in the current glyph into one clean outline (Illustrator's Unite):
+ * the shapes that have selected points, or every shape when nothing is selected.
+ */
+export function mergeShapes(): boolean {
+  const gid = currentGid();
+  const p = proj();
+  const base = baseOutline(font(), gid, p);
+  if (!base?.fits) return false;
+  const ed = moved(base, p.edits[gid]?.pts);
+  const which: number[] = [];
+  let s = 0;
+  base.ends.forEach((e, ci) => {
+    for (let k = s; k <= e; k++) if (state.selPts.has(k)) {
+      which.push(ci);
+      break;
+    }
+    s = e + 1;
+  });
+  const r = mergeContours(ed, which);
+  if (!r || !r.pts.length) return false;
+  if (!applyStructural([{ outline: r.pts.flatMap((q) => [q.x, q.y, q.on ? 1 : 0]), ends: r.ends }])) return false;
+  state.selPts = new Set();
+  return true;
+}
+
+/** Rounds the selected corners (on-curve points) of the current glyph with radius `r`. */
+export function roundCorners(r: number): boolean {
+  const base = baseOutline(font(), currentGid(), proj());
+  if (!base?.fits || !(r > 0)) return false;
+  const idx = [...state.selPts].filter((i) => base.pts[i]?.on).sort((a, b) => b - a);
+  if (!idx.length) return false;
+  if (!applyStructural(idx.map((i) => ({ round: i, r: Math.round(r) })))) return false;
+  state.selPts = new Set();
   return true;
 }
 
