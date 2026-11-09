@@ -27,6 +27,7 @@
         </div>
       </details>
       <input id="projFile" type="file" accept=".json,application/json" hidden>
+      <button id="checkFont" title="Find small slips in the letters you changed, like a bar just off the cap height or a line not quite straight, and fix them">Check font</button>
       <button id="export" class="primary">Export font</button>
     </div>
   </header>
@@ -186,6 +187,15 @@
       </details>
     </aside>
   </main>
+</div>
+<div class="dlgwrap" id="checkDlg" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="checkTitle">
+    <div class="row"><h2 id="checkTitle">Check font</h2><button id="checkClose" class="icon" aria-label="Close">×</button></div>
+    <p class="note">Looks through the letters you changed for edges just off a guide line, lines that aren't quite straight, doubled points, tiny stray shapes, and shapes that overlap or run backwards.</p>
+    <p id="checkSum"></p>
+    <div id="checkList" class="chklist"></div>
+    <div class="btns end"><button id="checkFixAll" class="primary">Fix all</button></div>
+  </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="js/panel.js"></script>

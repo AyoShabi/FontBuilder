@@ -60,6 +60,13 @@ brand's own font.
     pick up the first one, restart Illustrator once.
   - **As shapes (instant)**: **Preview selected text** hides the text and draws it in your
     edited font, redrawn after every edit. **Stop** shows your text again, unchanged.
+- **Check font** (top bar): looks through the letters you changed for small slips and lists
+  them by letter: a flat edge a few units off a guide line, a line that's almost but not quite
+  level or upright, two points on top of each other, a shape too small to see, shapes you drew
+  that overlap the letter, and shapes running the wrong way round. **Show** takes you to the
+  letter with the points selected, **Fix** fixes one letter, **Fix all** fixes everything in one
+  undo step. Only points you moved or added are touched, so the starting font's own design
+  (like round letters dipping just below the baseline) is left alone.
 - **Export**: saves a `.ttf` with your font's name and style, and a licence file next to it. The
   name is checked against the licence's Reserved Font Names. The original copyright and licence
   stay in the font. Kerning and other features carry over.

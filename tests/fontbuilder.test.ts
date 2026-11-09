@@ -443,3 +443,66 @@ describe("Merge shapes and round corners", () => {
     expect(r.pts.some((q) => q.on && q.x === c.x && q.y === c.y)).toBe(false);
   });
 });
+
+describe("Check font", () => {
+  /** An on-curve corner of H at the cap height with a flat line to its neighbour, and a stem corner on the baseline. */
+  const corners = () => {
+    const o = editedOutline(font, gid("H"), proj());
+    const cap = Math.max(...o.pts.map((q) => q.y));
+    const top = o.pts.findIndex((q, i) => q.on && q.y === cap && o.pts.some((r, j) => j !== i && r.on && r.y === cap));
+    const foot = o.pts.findIndex((q) => q.on && q.y === 0);
+    return { o, top, foot, cap };
+  };
+
+  it("finds nothing in letters you haven't touched", async () => {
+    const { checkFont } = await import("../src/editor/check");
+    expect(checkFont(font, proj())).toEqual([]);
+  });
+
+  it("puts a bar dragged just under the cap height back on the line", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { setPoint } = await import("../src/editor/edits");
+    setCurrentGid(gid("H"));
+    const { o, top, cap } = corners();
+    setPoint(top, o.pts[top].x, cap - 5);
+    const issues = checkFont(font, proj());
+    expect(issues.some((i) => i.kind === "guide" && i.gid === gid("H") && i.pts.includes(top))).toBe(true);
+    expect(fixFont(font, proj())).toBe(1);
+    expect(editedOutline(font, gid("H"), proj()).pts[top].y).toBe(cap);
+    expect(checkFont(font, proj())).toEqual([]);
+    undo();
+    expect(editedOutline(font, gid("H"), proj()).pts[top].y).toBe(cap - 5);
+  });
+
+  it("straightens a stem nudged a few units off upright", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { setPoint } = await import("../src/editor/edits");
+    setCurrentGid(gid("H"));
+    const { o, foot } = corners();
+    const x = o.pts[foot].x;
+    setPoint(foot, x + 4, 0);
+    expect(checkFont(font, proj()).some((i) => i.kind === "line")).toBe(true);
+    fixFont(font, proj());
+    expect(editedOutline(font, gid("H"), proj()).pts[foot].x).toBe(x);
+    expect(checkFont(font, proj())).toEqual([]);
+  });
+
+  it("removes a tiny stray shape and merges a shape that overlaps the letter", async () => {
+    const { checkFont, fixFont } = await import("../src/editor/check");
+    const { addShape } = await import("../src/editor/edits");
+    const { rectPoints } = await import("../src/editor/outline");
+    setCurrentGid(gid("I"));
+    const o = editedOutline(font, gid("I"), proj());
+    const n = o.ends.length;
+    const xs = o.pts.map((q) => q.x);
+    addShape(rectPoints(-400, 300, -395, 304), false);
+    addShape(rectPoints(Math.min(...xs) - 50, 200, Math.max(...xs) + 50, 260), false);
+    const kinds = checkFont(font, proj()).map((i) => i.kind);
+    expect(kinds).toContain("stray");
+    fixFont(font, proj());
+    const after = editedOutline(font, gid("I"), proj());
+    expect(after.ends.length).toBe(n);
+    expect(Math.min(...after.pts.map((q) => q.x))).toBe(Math.min(...xs) - 50);
+    expect(checkFont(font, proj())).toEqual([]);
+  });
+});

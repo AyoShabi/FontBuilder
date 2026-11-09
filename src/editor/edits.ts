@@ -149,7 +149,7 @@ export function canEditPoints(gid = currentGid()): boolean {
 }
 
 /** The outline with points moved but not shifted, so new offsets come out as edited minus base. */
-function moved(base: Outline, d: Record<number, [number, number]> | undefined): Outline {
+export function moved(base: Outline, d: Record<number, [number, number]> | undefined): Outline {
   return { ends: base.ends, pts: base.pts.map((q, i) => ({ x: q.x + (d?.[i]?.[0] || 0), y: q.y + (d?.[i]?.[1] || 0), on: q.on })) };
 }
 
@@ -157,8 +157,7 @@ function moved(base: Outline, d: Record<number, [number, number]> | undefined): 
  * Applies add/remove steps to the current glyph. Each step runs on both the unmoved outline and
  * the moved one, and the new offsets are the difference, so moved points stay where they are.
  */
-function applyStructural(ops: OutlineOp[]): boolean {
-  const gid = currentGid();
+export function applyStructural(ops: OutlineOp[], gid = currentGid(), undo = true): boolean {
   const p = proj();
   const start = baseOutline(font(), gid, p);
   if (!start?.fits || !ops.length) return false;
@@ -169,7 +168,7 @@ function applyStructural(ops: OutlineOp[]): boolean {
     ed = applyOp(ed!, op);
     if (!base || !ed || base.pts.length !== ed.pts.length) return false;
   }
-  pushUndo();
+  if (undo) pushUndo();
   const e = glyphEdit(gid);
   e.ops = [...(e.ops || []), ...ops];
   const pts: Record<number, [number, number]> = {};

@@ -570,6 +570,12 @@ export function bindStage(app: App): void {
 
   document.addEventListener("keydown", (ev) => {
     if (typing(ev.target, ev.key)) return;
+    // The Check font window is open: Escape closes it, other keys stay out of the editor.
+    const dlg = document.getElementById("checkDlg");
+    if (dlg && !dlg.hidden) {
+      if (ev.key === "Escape") dlg.hidden = true;
+      return;
+    }
     const mod = ev.ctrlKey || ev.metaKey;
     const key = ev.key.toLowerCase();
 
